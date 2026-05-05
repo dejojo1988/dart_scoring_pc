@@ -5,6 +5,9 @@ import 'dart:io';
 import '../app_version.dart';
 
 class UpdateSettings {
+  static const String defaultManifestLocation =
+      'https://raw.githubusercontent.com/dejojo1988/dart_scoring_pc/main/updates/beta/update.json';
+
   final String manifestLocation;
 
   const UpdateSettings({
@@ -13,7 +16,7 @@ class UpdateSettings {
 
   factory UpdateSettings.defaults() {
     return const UpdateSettings(
-      manifestLocation: '',
+      manifestLocation: defaultManifestLocation,
     );
   }
 
@@ -34,9 +37,13 @@ class UpdateSettings {
   factory UpdateSettings.fromJson(Map<String, Object?> json) {
     final Object? rawManifestLocation = json['manifestLocation'];
 
+    final String manifestLocation =
+        rawManifestLocation is String ? rawManifestLocation.trim() : '';
+
     return UpdateSettings(
-      manifestLocation:
-          rawManifestLocation is String ? rawManifestLocation.trim() : '',
+      manifestLocation: manifestLocation.isEmpty
+          ? defaultManifestLocation
+          : manifestLocation,
     );
   }
 }
@@ -145,7 +152,9 @@ class UpdateService {
       final Object? decoded = jsonDecode(content);
 
       if (decoded is Map<String, Object?>) {
-        _settings = UpdateSettings.fromJson(decoded);
+        _settings = _normalizeSettings(
+          UpdateSettings.fromJson(decoded),
+        );
       } else {
         _settings = UpdateSettings.defaults();
       }
@@ -171,8 +180,29 @@ class UpdateService {
   }
 
   Future<void> updateSettings(UpdateSettings settings) async {
-    _settings = settings;
+    _settings = _normalizeSettings(settings);
     await save();
+  }
+
+  UpdateSettings _normalizeSettings(UpdateSettings settings) {
+    final String manifestLocation = settings.manifestLocation.trim();
+
+    if (manifestLocation.isEmpty || _isOldOfficialReleaseManifestUrl(manifestLocation)) {
+      return UpdateSettings.defaults();
+    }
+
+    return settings.copyWith(
+      manifestLocation: manifestLocation,
+    );
+  }
+
+  bool _isOldOfficialReleaseManifestUrl(String manifestLocation) {
+    final String normalized = manifestLocation.trim().toLowerCase();
+
+    return normalized.startsWith(
+          'https://github.com/dejojo1988/dart_scoring_pc/releases/download/v',
+        ) &&
+        normalized.endsWith('/update.json');
   }
 
   Future<UpdateCheckResult> checkForUpdate() async {
@@ -235,11 +265,19 @@ class UpdateService {
     );
 
     if (_isHttpLocation(installerLocation)) {
-      await _downloadHttpFile(
-        url: installerLocation,
-        targetFile: targetFile,
-        onProgress: onProgress,
-      );
+      try {
+        await _downloadHttpFile(
+          url: installerLocation,
+          targetFile: targetFile,
+          onProgress: onProgress,
+        );
+      } catch (_) {
+        await _downloadHttpFileWithWindowsCurl(
+          url: installerLocation,
+          targetFile: targetFile,
+          onProgress: onProgress,
+        );
+      }
 
       return UpdateDownloadResult(installerFile: targetFile);
     }
@@ -323,25 +361,53 @@ class UpdateService {
     }
   }
 
+  Future<void> _downloadHttpFileWithWindowsCurl({
+    required String url,
+    required File targetFile,
+    required void Function(double progress) onProgress,
+  }) async {
+    await targetFile.parent.create(recursive: true);
+
+    final ProcessResult result = await Process.run(
+      'curl.exe',
+      [
+        '-L',
+        '--fail',
+        '--silent',
+        '--show-error',
+        '--output',
+        targetFile.path,
+        url,
+      ],
+      runInShell: true,
+    );
+
+    if (result.exitCode != 0) {
+      final String errorText = result.stderr.toString().trim();
+
+      throw StateError(
+        errorText.isEmpty
+            ? 'Installer konnte nicht heruntergeladen werden.'
+            : errorText,
+      );
+    }
+
+    if (!await targetFile.exists() || await targetFile.length() == 0) {
+      throw FileSystemException(
+        'Installer-Download ist leer oder fehlgeschlagen.',
+        targetFile.path,
+      );
+    }
+
+    onProgress(1);
+  }
+
   Future<String> _readTextFromLocation(String location) async {
     if (_isHttpLocation(location)) {
-      final HttpClient client = HttpClient();
-
       try {
-        final Uri uri = Uri.parse(location);
-        final HttpClientRequest request = await client.getUrl(uri);
-        final HttpClientResponse response = await request.close();
-
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          throw HttpException(
-            'Manifest konnte nicht geladen werden. HTTP ${response.statusCode}.',
-            uri: uri,
-          );
-        }
-
-        return await response.transform(utf8.decoder).join();
-      } finally {
-        client.close(force: true);
+        return await _readTextWithDartHttp(location);
+      } catch (_) {
+        return _readTextWithWindowsCurl(location);
       }
     }
 
@@ -355,6 +421,53 @@ class UpdateService {
     }
 
     return file.readAsString();
+  }
+
+  Future<String> _readTextWithDartHttp(String location) async {
+    final HttpClient client = HttpClient();
+
+    try {
+      final Uri uri = Uri.parse(location);
+      final HttpClientRequest request = await client.getUrl(uri);
+      final HttpClientResponse response = await request.close();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          'Manifest konnte nicht geladen werden. HTTP ${response.statusCode}.',
+          uri: uri,
+        );
+      }
+
+      return await response.transform(utf8.decoder).join();
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<String> _readTextWithWindowsCurl(String location) async {
+    final ProcessResult result = await Process.run(
+      'curl.exe',
+      [
+        '-L',
+        '--fail',
+        '--silent',
+        '--show-error',
+        location,
+      ],
+      runInShell: true,
+    );
+
+    if (result.exitCode != 0) {
+      final String errorText = result.stderr.toString().trim();
+
+      throw StateError(
+        errorText.isEmpty
+            ? 'Update-Manifest konnte nicht geladen werden.'
+            : errorText,
+      );
+    }
+
+    return result.stdout.toString();
   }
 
   String _resolveInstallerLocation({
