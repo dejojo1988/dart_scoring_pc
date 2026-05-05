@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0.3",
+  "channel": "beta",
+  "installerUrl": "DartScoringPC-Setup-1.0.0.3-beta.exe",
+  "notes": "Test-Update auf Version 1.0.0.3 BETA. Homescreen-Version wurde erhöht, um das Update-System zu prüfen."
+}

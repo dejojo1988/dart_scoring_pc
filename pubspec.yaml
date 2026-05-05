@@ -4,7 +4,7 @@ name: dart_scoring_pc
 description: "Dart Scoring Software for Windows PC."
 publish_to: 'none'
 
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.3.4 <4.0.0'
