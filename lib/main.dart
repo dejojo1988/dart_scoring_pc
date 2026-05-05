@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'services/appearance_service.dart';
+import 'services/window_mode_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,19 +13,7 @@ Future<void> main() async {
 
   await AppearanceService.instance.load();
 
-  await windowManager.ensureInitialized();
-
-  const WindowOptions windowOptions = WindowOptions(
-    backgroundColor: Colors.transparent,
-    skipTaskbar: false,
-    titleBarStyle: TitleBarStyle.normal,
-  );
-
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.setFullScreen(true);
-    await windowManager.show();
-    await windowManager.focus();
-  });
+  await WindowModeService.initWindowBeforeAppStart();
 
   runApp(const DartScoringApp());
 }

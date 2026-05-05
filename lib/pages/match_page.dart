@@ -1126,25 +1126,43 @@ class _MatchPageState extends State<MatchPage> {
   }
 
   void _resetScoresForNextLeg(Player startingPlayer) {
-    currentLegNumber += 1;
-    currentTurnNumber = 1;
-
-    for (final player in widget.players) {
-      remainingScores[player.id] = widget.settings.startScore;
-      playerIsIn[player.id] = widget.settings.inMode == InMode.straightIn;
+    if (!mounted) {
+      return;
     }
 
-    final int winnerIndex = widget.players.indexWhere(
-      (player) => player.id == startingPlayer.id,
-    );
+    setState(() {
+      currentLegNumber += 1;
+      currentTurnNumber = 1;
+      currentTurnDarts.clear();
+      turnSummaryDarts = [];
+      turnSummaryRunning = false;
+      turnSummaryIsBust = false;
+      turnSummaryPlayerName = '';
+      turnSummaryScore = 0;
+      turnSummaryTitle = 'AUFNAHME';
+      turnSummarySubtitle = '';
+      botSequenceToken++;
+      botTurnRunning = false;
+      _resetBotDisplay();
 
-    if (winnerIndex >= 0) {
-      activePlayerIndex = winnerIndex;
-    }
+      for (final player in widget.players) {
+        remainingScores[player.id] = widget.settings.startScore;
+        playerIsIn[player.id] = widget.settings.inMode == InMode.straightIn;
+      }
 
-    turnStartScore =
-        remainingScores[activePlayer.id] ?? widget.settings.startScore;
-    turnStartedPlayerIsIn = activePlayerIsIn;
+      final int startingPlayerIndex = widget.players.indexWhere(
+        (player) => player.id == startingPlayer.id,
+      );
+
+      if (startingPlayerIndex >= 0) {
+        activePlayerIndex = startingPlayerIndex;
+      }
+
+      turnStartScore =
+          remainingScores[activePlayer.id] ?? widget.settings.startScore;
+      turnStartedPlayerIsIn = activePlayerIsIn;
+      message = 'Neues Leg. ${activePlayer.name} beginnt.';
+    });
 
     unawaited(_announceCurrentPlayerThenMaybeStartBot());
   }
