@@ -889,12 +889,14 @@ class AudioService {
     final String escaped = text.replaceAll("'", "''");
     final int volume = (_settings.volume * 100).round().clamp(0, 100).toInt();
 
-    final String command = 'Add-Type -AssemblyName System.Speech; '
-        r'$speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer; '
-        r'$speaker.Volume = ' + volume.toString() + '; '
-        r'$speaker.Rate = 0; '
-        r"$speaker.Speak('" + escaped + r"'); "
-        r'$speaker.Dispose();';
+    final String command = '''
+Add-Type -AssemblyName System.Speech;
+\$speaker = New-Object System.Speech.Synthesis.SpeechSynthesizer;
+\$speaker.Volume = $volume;
+\$speaker.Rate = 0;
+\$speaker.Speak('$escaped');
+\$speaker.Dispose();
+''';
 
     try {
       await Process.run(

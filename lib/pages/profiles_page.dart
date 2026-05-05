@@ -109,10 +109,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
                       width: 54,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.13),
+                        color: accentColor.withValues(alpha:0.13),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: accentColor.withOpacity(0.25),
+                          color: accentColor.withValues(alpha:0.25),
                         ),
                       ),
                       child: Icon(
@@ -243,10 +243,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
                       width: 54,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.13),
+                        color: accentColor.withValues(alpha:0.13),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: accentColor.withOpacity(0.25),
+                          color: accentColor.withValues(alpha:0.25),
                         ),
                       ),
                       child: Icon(
@@ -375,10 +375,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
                       width: 54,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF5C77).withOpacity(0.13),
+                        color: const Color(0xFFFF5C77).withValues(alpha:0.13),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: const Color(0xFFFF5C77).withOpacity(0.35),
+                          color: const Color(0xFFFF5C77).withValues(alpha:0.35),
                         ),
                       ),
                       child: const Icon(
@@ -748,7 +748,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              accentColor.withOpacity(0.20),
+              accentColor.withValues(alpha:0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -811,10 +811,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.13),
+            color: accentColor.withValues(alpha:0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withOpacity(0.25),
+              color: accentColor.withValues(alpha:0.25),
             ),
           ),
           child: Icon(
@@ -1044,7 +1044,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
                   color: Theme.of(context)
                       .colorScheme
                       .primary
-                      .withOpacity(0.13),
+                      .withValues(alpha:0.13),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(
@@ -1373,7 +1373,7 @@ class _BigActionButton extends StatelessWidget {
               width: 54,
               height: 54,
               decoration: BoxDecoration(
-                color: accentColor.withOpacity(0.13),
+                color: accentColor.withValues(alpha:0.13),
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(
@@ -1443,7 +1443,7 @@ class _PlayerProfileCard extends StatelessWidget {
     final Color accentColor = Theme.of(context).colorScheme.primary;
 
     return Material(
-      color: isSelected ? accentColor.withOpacity(0.12) : const Color(0xFF141A22),
+      color: isSelected ? accentColor.withValues(alpha:0.12) : const Color(0xFF141A22),
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: onTap,

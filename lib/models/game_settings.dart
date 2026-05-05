@@ -60,7 +60,7 @@ class GameSettings {
   String get gameTitle {
     switch (gameType) {
       case GameType.x01:
-        return '${startScore} x01';
+        return '$startScore x01';
       case GameType.roundTheClock:
         return 'Round the Clock';
     }

@@ -125,10 +125,10 @@ class _DartInputGridState extends State<DartInputGrid> {
             height: 34,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.13),
+              color: accentColor.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(13),
               border: Border.all(
-                color: accentColor.withOpacity(0.35),
+                color: accentColor.withValues(alpha: 0.35),
               ),
             ),
             child: Center(
@@ -319,7 +319,7 @@ class _ThrowTypeButton extends StatelessWidget {
               height: 27,
               decoration: BoxDecoration(
                 color: isSelected
-                    ? const Color(0xFF06100B).withOpacity(0.1)
+                    ? const Color(0xFF06100B).withValues(alpha: 0.10)
                     : const Color(0xFF101720),
                 borderRadius: BorderRadius.circular(9),
               ),
@@ -397,55 +397,44 @@ class _NumberButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isSingle = throwType == DartThrowType.single;
-
-    return Material(
-      color: isSingle
-          ? const Color(0xFF141A22)
-          : accentColor.withOpacity(0.12),
-      borderRadius: BorderRadius.circular(15),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(15),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: isSingle ? const Color(0xFF2A3545) : accentColor,
-              width: isSingle ? 1.1 : 1.5,
-            ),
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF141A22),
+        foregroundColor: const Color(0xFFEAF1F8),
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17),
+          side: const BorderSide(
+            color: Color(0xFF2A3545),
+            width: 1.0,
           ),
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '$prefix$number',
-                      style: TextStyle(
-                        color:
-                            isSingle ? const Color(0xFFEAF1F8) : accentColor,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$score Punkte',
-                      style: const TextStyle(
-                        color: Color(0xFF9DA8B7),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+        ),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '$prefix$number',
+              style: const TextStyle(
+                color: Color(0xFFEAF1F8),
+                fontSize: 21,
+                fontWeight: FontWeight.w900,
               ),
             ),
-          ),
+            const SizedBox(height: 2),
+            Text(
+              score == 1 ? '1 Punkt' : '$score Punkte',
+              style: const TextStyle(
+                color: Color(0xFF9DA8B7),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );

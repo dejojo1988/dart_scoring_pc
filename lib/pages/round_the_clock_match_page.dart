@@ -388,7 +388,7 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              accentColor.withOpacity(0.20),
+              accentColor.withValues(alpha:0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -451,10 +451,10 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.13),
+            color: accentColor.withValues(alpha:0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withOpacity(0.25),
+              color: accentColor.withValues(alpha:0.25),
             ),
           ),
           child: Icon(
@@ -706,7 +706,7 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
           decoration: BoxDecoration(
             color: dartThrow == null
                 ? const Color(0xFF141A22)
-                : accentColor.withOpacity(0.14),
+                : accentColor.withValues(alpha:0.14),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: dartThrow == null ? const Color(0xFF2A3545) : accentColor,
@@ -811,7 +811,7 @@ class _RoundPlayerCard extends StatelessWidget {
       height: 132,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: isActive ? accentColor.withOpacity(0.12) : const Color(0xFF101720),
+        color: isActive ? accentColor.withValues(alpha:0.12) : const Color(0xFF101720),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isActive ? accentColor : const Color(0xFF243040),

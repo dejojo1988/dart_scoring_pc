@@ -22,27 +22,34 @@ class StartingPlayerPage extends StatefulWidget {
 }
 
 class _StartingPlayerPageState extends State<StartingPlayerPage> {
-  Player? selectedPlayer;
-  bool hasRolled = false;
+  Player? selectedStartingPlayer;
 
-  void _rollStartingPlayer() {
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.players.isNotEmpty) {
+      selectedStartingPlayer = widget.players.first;
+    }
+  }
+
+  void _selectRandomStartingPlayer() {
     if (widget.players.isEmpty) {
       return;
     }
 
-    final random = Random();
-    final index = random.nextInt(widget.players.length);
+    final Random random = Random();
 
     setState(() {
-      selectedPlayer = widget.players[index];
-      hasRolled = true;
+      selectedStartingPlayer = widget.players[random.nextInt(widget.players.length)];
     });
   }
 
-  void _continueToMatch() {
-    final Player? player = selectedPlayer;
+  void _startMatch() {
+    final Player? startingPlayer = selectedStartingPlayer;
 
-    if (player == null) {
+    if (startingPlayer == null) {
+      _showMessage('Wähle einen Startspieler aus.');
       return;
     }
 
@@ -52,7 +59,7 @@ class _StartingPlayerPageState extends State<StartingPlayerPage> {
           builder: (context) => RoundTheClockMatchPage(
             settings: widget.settings,
             players: widget.players,
-            startingPlayer: player,
+            startingPlayer: startingPlayer,
           ),
         ),
       );
@@ -65,15 +72,28 @@ class _StartingPlayerPageState extends State<StartingPlayerPage> {
         builder: (context) => MatchPage(
           settings: widget.settings,
           players: widget.players,
-          startingPlayer: player,
+          startingPlayer: startingPlayer,
         ),
+      ),
+    );
+  }
+
+  void _showMessage(String text) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1B2430),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final Player? player = selectedPlayer;
     final Color accentColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
@@ -84,146 +104,23 @@ class _StartingPlayerPageState extends State<StartingPlayerPage> {
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              accentColor.withOpacity(0.20),
+              accentColor.withValues(alpha: 0.20),
               const Color(0xFF0B0F14),
             ],
           ),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 42, vertical: 30),
+            padding: const EdgeInsets.symmetric(horizontal: 42, vertical: 34),
             child: Column(
               children: [
                 _buildHeader(context),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          maxWidth: 720,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF101720),
-                            borderRadius: BorderRadius.circular(34),
-                            border: Border.all(
-                              color: const Color(0xFF243040),
-                              width: 1.3,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.casino_rounded,
-                                color: accentColor,
-                                size: 64,
-                              ),
-                              const SizedBox(height: 18),
-                              const Text(
-                                'Wer beginnt?',
-                                style: TextStyle(
-                                  fontSize: 38,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                '${widget.settings.gameTitle} · ${widget.settings.matchFormatLabel}',
-                                style: const TextStyle(
-                                  color: Color(0xFF9DA8B7),
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 28),
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 250),
-                                child: player == null
-                                    ? _buildWaitingBox()
-                                    : _buildSelectedPlayerBox(player),
-                              ),
-                              const SizedBox(height: 28),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: 66,
-                                      child: ElevatedButton(
-                                        onPressed: _rollStartingPlayer,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              const Color(0xFF141A22),
-                                          foregroundColor: Colors.white,
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(22),
-                                            side: const BorderSide(
-                                              color: Color(0xFF2A3545),
-                                            ),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          hasRolled
-                                              ? 'Neu auslosen'
-                                              : 'Startspieler auslosen',
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontSize: 19,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 18),
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: 66,
-                                      child: ElevatedButton(
-                                        onPressed: player == null
-                                            ? null
-                                            : _continueToMatch,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: accentColor,
-                                          disabledBackgroundColor:
-                                              const Color(0xFF243040),
-                                          foregroundColor:
-                                              const Color(0xFF06100B),
-                                          disabledForegroundColor:
-                                              const Color(0xFF6F7A89),
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(22),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Weiter zum Match',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 19,
-                                            fontWeight: FontWeight.w900,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _buildPlayerSelectionPanel(),
                 ),
-                const SizedBox(height: 18),
-                _buildPlayerList(),
+                const SizedBox(height: 22),
+                _buildBottomBar(),
               ],
             ),
           ),
@@ -233,8 +130,6 @@ class _StartingPlayerPageState extends State<StartingPlayerPage> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final bool isRoundTheClock =
-        widget.settings.gameType == GameType.roundTheClock;
     final Color accentColor = Theme.of(context).colorScheme.primary;
 
     return Row(
@@ -253,183 +148,280 @@ class _StartingPlayerPageState extends State<StartingPlayerPage> {
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.13),
+            color: accentColor.withValues(alpha: 0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withOpacity(0.25),
+              color: accentColor.withValues(alpha: 0.25),
             ),
           ),
           child: Icon(
-            isRoundTheClock
-                ? Icons.access_time_filled_rounded
-                : Icons.casino_rounded,
+            Icons.shuffle_rounded,
             color: accentColor,
             size: 34,
           ),
         ),
         const SizedBox(width: 18),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isRoundTheClock ? 'Round the Clock Start' : 'Startspieler',
-              style: const TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.2,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Startspieler',
+                style: TextStyle(
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.2,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Zufällig entscheiden, wer das Match beginnt',
-              style: TextStyle(
-                fontSize: 15,
-                color: Color(0xFF9DA8B7),
-                fontWeight: FontWeight.w500,
+              const SizedBox(height: 4),
+              Text(
+                '${widget.settings.gameTitle} · ${widget.settings.matchFormatLabel}',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFF9DA8B7),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildWaitingBox() {
+  Widget _buildPlayerSelectionPanel() {
     return Container(
-      key: const ValueKey('waiting'),
-      height: 130,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFF141A22),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: const Color(0xFF2A3545),
-        ),
-      ),
-      child: const Center(
-        child: Text(
-          'Noch kein Spieler ausgelost',
-          style: TextStyle(
-            color: Color(0xFF9DA8B7),
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSelectedPlayerBox(Player player) {
-    final Color accentColor = Theme.of(context).colorScheme.primary;
-
-    return Container(
-      key: ValueKey(player.id),
-      height: 130,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: accentColor,
-          width: 1.5,
-        ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Beginnt:',
-              style: TextStyle(
-                color: Color(0xFF9DA8B7),
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              player.name,
-              style: const TextStyle(
-                color: Color(0xFFEAF1F8),
-                fontSize: 38,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlayerList() {
-    final Color accentColor = Theme.of(context).colorScheme.primary;
-
-    return Container(
-      height: 76,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: const Color(0xFF101720),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
           color: const Color(0xFF243040),
+          width: 1.2,
         ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(
-            Icons.groups_rounded,
-            color: accentColor,
-          ),
-          const SizedBox(width: 14),
-          const Text(
-            'Teilnehmer:',
-            style: TextStyle(
-              color: Color(0xFF9DA8B7),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: widget.players.map((player) {
-                  final bool isSelected = selectedPlayer?.id == player.id;
-
-                  return Container(
-                    margin: const EdgeInsets.only(right: 10),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? accentColor
-                          : const Color(0xFF141A22),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: isSelected
-                            ? accentColor
-                            : const Color(0xFF2A3545),
-                      ),
-                    ),
-                    child: Text(
-                      player.name,
-                      style: TextStyle(
-                        color: isSelected
-                            ? const Color(0xFF06100B)
-                            : const Color(0xFFEAF1F8),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  );
-                }).toList(),
+          Row(
+            children: [
+              Icon(
+                Icons.radio_button_checked,
+                color: Theme.of(context).colorScheme.primary,
               ),
+              const SizedBox(width: 10),
+              const Text(
+                'Wer beginnt?',
+                style: TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${widget.players.length} Spieler',
+                style: const TextStyle(
+                  color: Color(0xFF9DA8B7),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Expanded(
+            child: GridView.builder(
+              itemCount: widget.players.length,
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 250,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.75,
+              ),
+              itemBuilder: (context, index) {
+                final Player player = widget.players[index];
+                final bool isSelected = selectedStartingPlayer?.id == player.id;
+
+                return _StartingPlayerCard(
+                  player: player,
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() {
+                      selectedStartingPlayer = player;
+                    });
+                  },
+                );
+              },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    final Color accentColor = Theme.of(context).colorScheme.primary;
+    final Player? startingPlayer = selectedStartingPlayer;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 78,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFF101720),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFF243040),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: accentColor,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    startingPlayer == null
+                        ? 'Noch kein Startspieler ausgewählt.'
+                        : '${startingPlayer.name} beginnt das Match.',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF9DA8B7),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 18),
+        SizedBox(
+          height: 78,
+          width: 240,
+          child: ElevatedButton.icon(
+            onPressed: _selectRandomStartingPlayer,
+            icon: const Icon(Icons.casino_rounded),
+            label: const Text('Zufällig'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF141A22),
+              foregroundColor: accentColor,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: const BorderSide(
+                  color: Color(0xFF243040),
+                ),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 18),
+        SizedBox(
+          height: 78,
+          width: 260,
+          child: ElevatedButton(
+            onPressed: _startMatch,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: startingPlayer == null
+                  ? const Color(0xFF243040)
+                  : accentColor,
+              foregroundColor: startingPlayer == null
+                  ? const Color(0xFF6F7A89)
+                  : const Color(0xFF06100B),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+            child: const Text(
+              'Match starten',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StartingPlayerCard extends StatelessWidget {
+  final Player player;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _StartingPlayerCard({
+    required this.player,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accentColor = Theme.of(context).colorScheme.primary;
+
+    return Material(
+      color: isSelected ? accentColor : const Color(0xFF141A22),
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isSelected ? accentColor : const Color(0xFF2A3545),
+              width: isSelected ? 1.6 : 1.1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFF06100B).withValues(alpha: 0.14)
+                      : accentColor.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : Icons.person_rounded,
+                  color: isSelected ? const Color(0xFF06100B) : accentColor,
+                  size: 31,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  player.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color:
+                        isSelected ? const Color(0xFF06100B) : Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -39,7 +39,7 @@ class GameSelectionPage extends StatelessWidget {
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              accentColor.withOpacity(0.20),
+              accentColor.withValues(alpha: 0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -114,10 +114,10 @@ class GameSelectionPage extends StatelessWidget {
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.13),
+            color: accentColor.withValues(alpha: 0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withOpacity(0.25),
+              color: accentColor.withValues(alpha: 0.25),
             ),
           ),
           child: Icon(

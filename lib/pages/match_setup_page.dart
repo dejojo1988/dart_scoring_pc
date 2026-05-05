@@ -35,7 +35,7 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
   bool get isRoundTheClock => settings.gameType == GameType.roundTheClock;
 
   Player get adaptiveBotPlayer {
-    return Player(
+    return const Player(
       id: 'bot_adaptive',
       name: 'Bot Gegner',
     );
@@ -118,7 +118,7 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
             final Color accentColor = Theme.of(context).colorScheme.primary;
 
             bool canAddAnotherPlayer() {
-              if (botOpponentEnabled && tempSelected.length >= 1) {
+              if (botOpponentEnabled && tempSelected.isNotEmpty) {
                 _showMessage(
                   'Bot-Gegner ist nur mit genau einem menschlichen Spieler möglich.',
                 );
@@ -158,10 +158,10 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
                           width: 54,
                           height: 54,
                           decoration: BoxDecoration(
-                            color: accentColor.withOpacity(0.13),
+                            color: accentColor.withValues(alpha:0.13),
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(
-                              color: accentColor.withOpacity(0.25),
+                              color: accentColor.withValues(alpha:0.25),
                             ),
                           ),
                           child: Icon(
@@ -524,7 +524,7 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              accentColor.withOpacity(0.20),
+              accentColor.withValues(alpha:0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -580,10 +580,10 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.13),
+            color: accentColor.withValues(alpha:0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withOpacity(0.25),
+              color: accentColor.withValues(alpha:0.25),
             ),
           ),
           child: Icon(
@@ -1047,10 +1047,10 @@ class _DialogBotInfoBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.10),
+        color: accentColor.withValues(alpha:0.10),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: accentColor.withOpacity(0.35),
+          color: accentColor.withValues(alpha:0.35),
         ),
       ),
       child: Row(
@@ -1248,7 +1248,7 @@ class _PlayerCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: isProfile || isBot
-                    ? accentColor.withOpacity(0.14)
+                    ? accentColor.withValues(alpha:0.14)
                     : const Color(0xFF243040),
                 borderRadius: BorderRadius.circular(999),
               ),
@@ -1337,7 +1337,7 @@ class _AddPlayerCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: accentColor.withOpacity(0.45),
+              color: accentColor.withValues(alpha:0.45),
               width: 1.5,
             ),
           ),
@@ -1386,7 +1386,7 @@ class _AvailablePlayerCard extends StatelessWidget {
               color: isSelected
                   ? accentColor
                   : isProfile
-                      ? accentColor.withOpacity(0.55)
+                      ? accentColor.withValues(alpha:0.55)
                       : const Color(0xFF2A3545),
               width: 1.4,
             ),
@@ -1403,9 +1403,9 @@ class _AvailablePlayerCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? const Color(0xFF06100B).withOpacity(0.14)
+                        ? const Color(0xFF06100B).withValues(alpha:0.14)
                         : isProfile
-                            ? accentColor.withOpacity(0.14)
+                            ? accentColor.withValues(alpha:0.14)
                             : const Color(0xFF243040),
                     borderRadius: BorderRadius.circular(999),
                   ),
@@ -1479,7 +1479,7 @@ class _BotOpponentCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: enabled ? accentColor.withOpacity(0.11) : const Color(0xFF141A22),
+        color: enabled ? accentColor.withValues(alpha:0.11) : const Color(0xFF141A22),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: enabled ? accentColor : const Color(0xFF2A3545),
@@ -1532,7 +1532,7 @@ class _BotOpponentCard extends StatelessWidget {
           const SizedBox(width: 12),
           Switch(
             value: enabled,
-            activeColor: accentColor,
+            activeThumbColor: accentColor,
             onChanged: onChanged,
           ),
         ],

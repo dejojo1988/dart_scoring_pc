@@ -30,7 +30,7 @@ class PlayerScoreCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: isActive
-            ? accentColor.withOpacity(0.12)
+            ? accentColor.withValues(alpha: 0.12)
             : const Color(0xFF101720),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(

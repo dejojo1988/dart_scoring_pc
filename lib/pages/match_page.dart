@@ -697,7 +697,7 @@ class _MatchPageState extends State<MatchPage> {
     if (scoreAfterThrow == 0) {
       setState(() {
         remainingScores[throwingPlayer.id] = 0;
-        message = '${throwingPlayer.name} checkt ${turnStartScore} aus.';
+        message = '${throwingPlayer.name} checkt $turnStartScore aus.';
       });
 
       _recordX01DartsForCurrentTurn(
@@ -1330,7 +1330,7 @@ class _MatchPageState extends State<MatchPage> {
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              accentColor.withOpacity(0.20),
+              accentColor.withValues(alpha:0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -1391,10 +1391,10 @@ class _MatchPageState extends State<MatchPage> {
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.13),
+            color: accentColor.withValues(alpha:0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withOpacity(0.25),
+              color: accentColor.withValues(alpha:0.25),
             ),
           ),
           child: Icon(
@@ -1579,7 +1579,7 @@ class _MatchPageState extends State<MatchPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
-        color: summaryColor.withOpacity(0.18),
+        color: summaryColor.withValues(alpha:0.18),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
           color: summaryColor,
@@ -1587,7 +1587,7 @@ class _MatchPageState extends State<MatchPage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: summaryColor.withOpacity(0.18),
+            color: summaryColor.withValues(alpha:0.18),
             blurRadius: 26,
             offset: const Offset(0, 10),
           ),
@@ -1697,10 +1697,10 @@ class _MatchPageState extends State<MatchPage> {
             width: 92,
             height: 92,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.13),
+              color: accentColor.withValues(alpha:0.13),
               borderRadius: BorderRadius.circular(30),
               border: Border.all(
-                color: accentColor.withOpacity(0.35),
+                color: accentColor.withValues(alpha:0.35),
               ),
             ),
             child: Icon(
@@ -1893,7 +1893,7 @@ class _MatchPageState extends State<MatchPage> {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.13),
+              color: accentColor.withValues(alpha:0.13),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -1943,7 +1943,7 @@ class _MatchPageState extends State<MatchPage> {
           decoration: BoxDecoration(
             color: dartThrow == null
                 ? const Color(0xFF141A22)
-                : accentColor.withOpacity(0.14),
+                : accentColor.withValues(alpha:0.14),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: dartThrow == null ? const Color(0xFF2A3545) : accentColor,
@@ -2040,10 +2040,10 @@ class _TurnSummaryDartCard extends StatelessWidget {
       height: 138,
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: const Color(0xFF101720).withOpacity(0.78),
+        color: const Color(0xFF101720).withValues(alpha:0.78),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: summaryColor.withOpacity(0.75),
+          color: summaryColor.withValues(alpha:0.75),
           width: 1.5,
         ),
       ),
@@ -2108,7 +2108,7 @@ class _BotThrowDisplayCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: hasThrow || isActive
-            ? accentColor.withOpacity(0.13)
+            ? accentColor.withValues(alpha:0.13)
             : const Color(0xFF141A22),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
@@ -2118,7 +2118,7 @@ class _BotThrowDisplayCard extends StatelessWidget {
         boxShadow: [
           if (isActive)
             BoxShadow(
-              color: accentColor.withOpacity(0.22),
+              color: accentColor.withValues(alpha:0.22),
               blurRadius: 22,
               offset: const Offset(0, 8),
             ),

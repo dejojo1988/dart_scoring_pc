@@ -297,7 +297,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              liveAccentColor.withOpacity(0.20),
+              liveAccentColor.withValues(alpha:0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -352,10 +352,10 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.13),
+            color: accentColor.withValues(alpha:0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withOpacity(0.25),
+              color: accentColor.withValues(alpha:0.25),
             ),
           ),
           child: Icon(
@@ -901,7 +901,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                   padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
                     color: hasUpdate
-                        ? accentColor.withOpacity(0.11)
+                        ? accentColor.withValues(alpha:0.11)
                         : const Color(0xFF141A22),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
@@ -1202,7 +1202,7 @@ class _SwitchCard extends StatelessWidget {
           ),
           Switch(
             value: value,
-            activeColor: accentColor,
+            activeThumbColor: accentColor,
             onChanged: onChanged,
           ),
         ],
@@ -1316,7 +1316,7 @@ class _AudioEventCard extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.13),
+              color: accentColor.withValues(alpha:0.13),
               borderRadius: BorderRadius.circular(17),
             ),
             child: Icon(
@@ -1459,7 +1459,7 @@ class _AppearancePreview extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: accentColor.withOpacity(0.12),
+            color: accentColor.withValues(alpha:0.12),
             borderRadius: BorderRadius.circular(26),
             border: Border.all(
               color: accentColor,
@@ -1568,7 +1568,7 @@ class _PreviewTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color:
-            active ? accentColor.withOpacity(0.14) : const Color(0xFF141A22),
+            active ? accentColor.withValues(alpha:0.14) : const Color(0xFF141A22),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: active ? accentColor : const Color(0xFF2A3545),
