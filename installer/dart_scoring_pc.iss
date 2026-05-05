@@ -3,15 +3,18 @@
 ;
 ; Wichtig:
 ; - AppId NIEMALS ändern, sonst erkennt Windows spätere Updates nicht als dieselbe App.
-; - MyAppVersion bei jeder neuen Beta erhöhen.
+; - MyAppVersion wird von build_installer.bat per /DMyAppVersion=... gesetzt.
 ; - Vorher immer: flutter build windows --release
+; - Userdaten liegen unter: %APPDATA%\DartScoringPC
+; - AppData-Ordner wird bei Deinstallation/Update NICHT gelöscht.
+; - .dart_tool wird NICHT in den Installer gepackt.
 
 #define MyAppName "Dart Scoring PC"
 #define MyAppPublisher "dejojo"
 #define MyAppExeName "dart_scoring_pc.exe"
 
 #ifndef MyAppVersion
-#define MyAppVersion "1.0.0.2-beta.1"
+#define MyAppVersion "1.0.1.7-beta"
 #endif
 
 [Setup]
@@ -42,8 +45,12 @@ Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Desktop-Verknüpfung erstellen"; GroupDescription: "Zusätzliche Aufgaben:"; Flags: unchecked
 
+[Dirs]
+Name: "{userappdata}\DartScoringPC"; Flags: uninsneveruninstall
+Name: "{userappdata}\DartScoringPC\backups"; Flags: uninsneveruninstall
+
 [Files]
-Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Excludes: ".dart_tool\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

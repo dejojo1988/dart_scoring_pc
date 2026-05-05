@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app_version.dart';
+import 'data/app_database.dart';
 import 'pages/audio_settings_page.dart';
 import 'pages/home_page.dart';
 import 'services/appearance_service.dart';
@@ -69,7 +70,16 @@ class _HomeWithTopButtonsState extends State<_HomeWithTopButtons> {
   void initState() {
     super.initState();
 
+    _initializeDatabase();
     _scheduleAutomaticUpdateCheck();
+  }
+
+  Future<void> _initializeDatabase() async {
+    try {
+      await AppDatabase.instance.database;
+    } catch (_) {
+      // Datenbankfehler darf den App-Start nicht komplett verhindern.
+    }
   }
 
   Future<void> _closeApp() async {

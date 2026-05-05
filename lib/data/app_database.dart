@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -7,6 +9,10 @@ class AppDatabase {
   AppDatabase._();
 
   static final AppDatabase instance = AppDatabase._();
+
+  static const String _databaseFileName = 'dart_scoring_pc.db';
+  static const String _appDataFolderName = 'DartScoringPC';
+  static const String _backupFolderName = 'backups';
 
   Database? _database;
 
@@ -26,12 +32,14 @@ class AppDatabase {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
 
-    final String databasePath = await databaseFactory.getDatabasesPath();
+    final Directory databaseDirectory = await _getDatabaseDirectory();
 
     final String fullPath = path.join(
-      databasePath,
-      'dart_scoring_pc.db',
+      databaseDirectory.path,
+      _databaseFileName,
     );
+
+    await _createDatabaseBackupIfPossible(fullPath);
 
     return databaseFactory.openDatabase(
       fullPath,
@@ -44,6 +52,89 @@ class AppDatabase {
         onUpgrade: _upgradeDatabase,
       ),
     );
+  }
+
+  Future<Directory> _getDatabaseDirectory() async {
+    final String basePath =
+        Platform.environment['APPDATA'] ??
+        Platform.environment['LOCALAPPDATA'] ??
+        Directory.current.path;
+
+    final Directory directory = Directory(
+      path.join(basePath, _appDataFolderName),
+    );
+
+    await directory.create(recursive: true);
+
+    return directory;
+  }
+
+  Future<void> _createDatabaseBackupIfPossible(String databasePath) async {
+    try {
+      final File databaseFile = File(databasePath);
+
+      if (!await databaseFile.exists()) {
+        return;
+      }
+
+      final Directory backupDirectory = Directory(
+        path.join(
+          path.dirname(databasePath),
+          _backupFolderName,
+        ),
+      );
+
+      await backupDirectory.create(recursive: true);
+
+      final DateTime now = DateTime.now();
+      final String timestamp =
+          '${now.year.toString().padLeft(4, '0')}-'
+          '${now.month.toString().padLeft(2, '0')}-'
+          '${now.day.toString().padLeft(2, '0')}_'
+          '${now.hour.toString().padLeft(2, '0')}-'
+          '${now.minute.toString().padLeft(2, '0')}-'
+          '${now.second.toString().padLeft(2, '0')}';
+
+      final String backupPath = path.join(
+        backupDirectory.path,
+        'dart_scoring_pc_$timestamp.db',
+      );
+
+      await databaseFile.copy(backupPath);
+      await _cleanupOldBackups(backupDirectory);
+    } catch (_) {
+      // Backup darf den App-Start niemals verhindern.
+    }
+  }
+
+  Future<void> _cleanupOldBackups(Directory backupDirectory) async {
+    try {
+      final List<FileSystemEntity> entries = await backupDirectory.list().toList();
+
+      final List<File> backups = entries.whereType<File>().where((file) {
+        return path.basename(file.path).toLowerCase().endsWith('.db');
+      }).toList();
+
+      backups.sort((a, b) {
+        return b.lastModifiedSync().compareTo(a.lastModifiedSync());
+      });
+
+      const int maxBackups = 10;
+
+      if (backups.length <= maxBackups) {
+        return;
+      }
+
+      for (final File oldBackup in backups.skip(maxBackups)) {
+        try {
+          await oldBackup.delete();
+        } catch (_) {
+          // Einzelnes Backup darf Cleanup nicht blockieren.
+        }
+      }
+    } catch (_) {
+      // Cleanup darf nichts blockieren.
+    }
   }
 
   Future<void> _createDatabase(
@@ -620,7 +711,7 @@ class AppDatabase {
         await transaction.insert(
           'match_darts',
           {
-            'player_id': playerId,
+            'player_id': turn['player_id'],
             'game_type': turn['game_type'],
             'turn_score': turn['turn_score'],
             'dart_count': turn['dart_count'],
