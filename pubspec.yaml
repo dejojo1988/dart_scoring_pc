@@ -1,10 +1,8 @@
-DATEI: pubspec.yaml
-
 name: dart_scoring_pc
 description: "Dart Scoring Software for Windows PC."
 publish_to: 'none'
 
-version: 1.0.0+3
+version: 1.0.1+4
 
 environment:
   sdk: '>=3.3.4 <4.0.0'
