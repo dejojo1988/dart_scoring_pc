@@ -5,7 +5,7 @@ REM Dart Scoring PC - Build + Installer
 REM Diese Datei im Projektroot ausführen:
 REM C:\Work\Dev\VSCode_Projects\Tools\DartScoringNeu\dart_scoring_pc
 
-set APP_VERSION=1.0.1.7-beta
+set APP_VERSION=1.0.1.8-beta
 
 echo.
 echo ========================================
