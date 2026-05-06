@@ -14,7 +14,7 @@
 #define MyAppExeName "dart_scoring_pc.exe"
 
 #ifndef MyAppVersion
-#define MyAppVersion "1.0.2.0-beta"
+#define MyAppVersion "1.0.2.1-beta"
 #endif
 
 [Setup]

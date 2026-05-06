@@ -377,6 +377,39 @@ class AudioService {
     }
   }
 
+
+  Future<void> announceCheckoutRequirement({
+    required String playerName,
+    required int remainingScore,
+  }) async {
+    await load();
+
+    if (!_settings.audioEnabled) {
+      return;
+    }
+
+    if (remainingScore <= 0 || remainingScore > 180) {
+      return;
+    }
+
+    final int safeRemainingScore = remainingScore.clamp(0, 180).toInt();
+
+    final bool playedPlayerAsset = await _playDefaultPlayerTurnAsset(playerName);
+
+    if (!playedPlayerAsset) {
+      await speak(playerName);
+    }
+
+    final bool playedRequireAsset = await _playDefaultYouRequireAsset();
+    final bool playedNumberAsset = await _playDefaultNumberAsset(safeRemainingScore);
+
+    if (playedPlayerAsset || playedRequireAsset || playedNumberAsset) {
+      return;
+    }
+
+    await speak('$playerName benötigt $safeRemainingScore Punkte.');
+  }
+
   Future<bool> _playDefaultPlayerTurnAsset(String playerName) async {
     await load();
 
@@ -568,6 +601,27 @@ class AudioService {
     }
   }
 
+  Future<bool> _playDefaultYouRequireAsset() async {
+    await load();
+
+    if (!_settings.audioEnabled) {
+      return false;
+    }
+
+    bool playedRequire = false;
+
+    _voicePackQueue = _voicePackQueue.then((_) async {
+      playedRequire = await _playAssetFile(
+        '$_defaultPackAssetBasePath/you-require.mp3',
+        waitForCompletion: true,
+      );
+    });
+
+    await _voicePackQueue;
+
+    return playedRequire;
+  }
+
   Future<bool> _playDefaultNumberAsset(int number) async {
     await load();
 
@@ -690,6 +744,10 @@ class AudioService {
 
     if (normalizedPath.endsWith('/win.mp3')) {
       return const Duration(milliseconds: 4200);
+    }
+
+    if (normalizedPath.endsWith('/you-require.mp3')) {
+      return const Duration(milliseconds: 1800);
     }
 
     if (normalizedPath.endsWith('/you-bust.mp3')) {

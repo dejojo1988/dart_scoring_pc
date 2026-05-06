@@ -170,9 +170,11 @@ class _MatchPageState extends State<MatchPage> {
   bool botSkillLoaded = false;
   bool gameStartAnnouncementFinished = false;
   bool botTurnRunning = false;
+  bool turnIntroAnnouncementRunning = false;
   bool turnSummaryRunning = false;
   bool turnSummaryIsBust = false;
   int botSequenceToken = 0;
+  int turnIntroAnnouncementToken = 0;
   int activeBotDisplayIndex = -1;
   int turnSummaryScore = 0;
   String botDisplayStatus = 'Bot bereitet den Wurf vor.';
@@ -231,6 +233,7 @@ class _MatchPageState extends State<MatchPage> {
   @override
   void dispose() {
     botSequenceToken++;
+    turnIntroAnnouncementToken++;
     super.dispose();
   }
 
@@ -443,6 +446,7 @@ class _MatchPageState extends State<MatchPage> {
     if (!mounted ||
         !gameStartAnnouncementFinished ||
         matchFinished ||
+        turnIntroAnnouncementRunning ||
         turnSummaryRunning ||
         !activePlayerIsBot ||
         botTurnRunning) {
@@ -453,6 +457,7 @@ class _MatchPageState extends State<MatchPage> {
       if (!mounted ||
           !gameStartAnnouncementFinished ||
           matchFinished ||
+          turnIntroAnnouncementRunning ||
           turnSummaryRunning ||
           !activePlayerIsBot ||
           botTurnRunning) {
@@ -473,7 +478,11 @@ class _MatchPageState extends State<MatchPage> {
   }
 
   Future<void> _runBotTurn() async {
-    if (botTurnRunning || turnSummaryRunning || matchFinished || !activePlayerIsBot) {
+    if (botTurnRunning ||
+        turnIntroAnnouncementRunning ||
+        turnSummaryRunning ||
+        matchFinished ||
+        !activePlayerIsBot) {
       return;
     }
 
@@ -599,6 +608,11 @@ class _MatchPageState extends State<MatchPage> {
 
     if (turnSummaryRunning) {
       _showMessage('Die Aufnahme wird gerade abgeschlossen.');
+      return;
+    }
+
+    if (turnIntroAnnouncementRunning) {
+      _showMessage('Warte, bis die Checkout-Ansage fertig ist.');
       return;
     }
 
@@ -869,6 +883,7 @@ class _MatchPageState extends State<MatchPage> {
     }
 
     setState(() {
+      turnIntroAnnouncementRunning = false;
       turnSummaryRunning = false;
       turnSummaryIsBust = false;
       turnSummaryPlayerName = '';
@@ -880,19 +895,46 @@ class _MatchPageState extends State<MatchPage> {
     });
   }
 
+  bool _shouldPlayCheckoutRequirementAnnouncement(int remainingScore) {
+    return remainingScore > 0 && remainingScore <= 160 && !matchFinished;
+  }
+
   Future<void> _announceCurrentPlayerThenMaybeStartBot() async {
     final Player playerToAnnounce = activePlayer;
     final int scoreToAnnounce = activeRemainingScore;
+    final bool shouldAnnounceCheckoutRequirement =
+        _shouldPlayCheckoutRequirementAnnouncement(scoreToAnnounce);
+    final int announcementToken = ++turnIntroAnnouncementToken;
 
-    await AudioService.instance.announcePlayerTurn(
-      playerName: _audioLabelForPlayer(playerToAnnounce),
-      remainingScore: scoreToAnnounce,
-    );
+    if (shouldAnnounceCheckoutRequirement && mounted) {
+      setState(() {
+        turnIntroAnnouncementRunning = true;
+        message = '${playerToAnnounce.name} braucht $scoreToAnnounce Punkte.';
+      });
+    }
+
+    if (shouldAnnounceCheckoutRequirement) {
+      await AudioService.instance.announceCheckoutRequirement(
+        playerName: _audioLabelForPlayer(playerToAnnounce),
+        remainingScore: scoreToAnnounce,
+      );
+    } else {
+      await AudioService.instance.announcePlayerTurn(
+        playerName: _audioLabelForPlayer(playerToAnnounce),
+        remainingScore: scoreToAnnounce,
+      );
+    }
 
     await Future<void>.delayed(const Duration(milliseconds: 550));
 
-    if (!mounted) {
+    if (!mounted || announcementToken != turnIntroAnnouncementToken) {
       return;
+    }
+
+    if (turnIntroAnnouncementRunning) {
+      setState(() {
+        turnIntroAnnouncementRunning = false;
+      });
     }
 
     _maybeStartBotTurn();
@@ -1135,6 +1177,7 @@ class _MatchPageState extends State<MatchPage> {
       currentTurnNumber = 1;
       currentTurnDarts.clear();
       turnSummaryDarts = [];
+      turnIntroAnnouncementRunning = false;
       turnSummaryRunning = false;
       turnSummaryIsBust = false;
       turnSummaryPlayerName = '';
@@ -1142,6 +1185,7 @@ class _MatchPageState extends State<MatchPage> {
       turnSummaryTitle = 'AUFNAHME';
       turnSummarySubtitle = '';
       botSequenceToken++;
+      turnIntroAnnouncementToken++;
       botTurnRunning = false;
       _resetBotDisplay();
 
@@ -1196,8 +1240,8 @@ class _MatchPageState extends State<MatchPage> {
   }
 
   void _undoLastThrow() {
-    if (botTurnRunning || turnSummaryRunning) {
-      _showMessage('Während einer laufenden Aufnahme ist Undo gesperrt.');
+    if (botTurnRunning || turnIntroAnnouncementRunning || turnSummaryRunning) {
+      _showMessage('Während einer laufenden Aufnahme oder Ansage ist Undo gesperrt.');
       return;
     }
 
@@ -1574,16 +1618,104 @@ class _MatchPageState extends State<MatchPage> {
         _buildCheckoutBox(),
         const SizedBox(height: 14),
         Expanded(
-          child: turnSummaryRunning
-              ? _buildTurnSummaryBlocker()
-              : (activePlayerIsBot || botTurnRunning) && !matchFinished
-                  ? _buildBotInputBlocker()
-                  : DartInputGrid(
-                      onThrowSelected: _handleThrow,
-                      onUndo: _undoLastThrow,
-                    ),
+          child: turnIntroAnnouncementRunning
+              ? _buildTurnIntroAnnouncementBlocker()
+              : turnSummaryRunning
+                  ? _buildTurnSummaryBlocker()
+                  : (activePlayerIsBot || botTurnRunning) && !matchFinished
+                      ? _buildBotInputBlocker()
+                      : DartInputGrid(
+                          onThrowSelected: _handleThrow,
+                          onUndo: _undoLastThrow,
+                        ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTurnIntroAnnouncementBlocker() {
+    final int scoreToAnnounce = activeRemainingScore;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: double.infinity,
+      padding: const EdgeInsets.all(26),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: accentColor,
+          width: 2.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.16),
+            blurRadius: 26,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 92,
+            height: 92,
+            decoration: BoxDecoration(
+              color: accentColor,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: const Icon(
+              Icons.campaign_rounded,
+              color: Color(0xFF06100B),
+              size: 52,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'CHECKOUT-ANSAGE',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${activePlayer.name} benötigt $scoreToAnnounce Punkte.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: accentColor,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            '$scoreToAnnounce',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: accentColor,
+              fontSize: 82,
+              height: 0.95,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'WURF WIRD NACH DER ANSAGE FREIGEGEBEN',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFEAF1F8),
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
