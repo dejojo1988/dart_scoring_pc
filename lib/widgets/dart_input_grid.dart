@@ -190,26 +190,56 @@ class _DartInputGridState extends State<DartInputGrid> {
   }
 
   Widget _buildNumberGrid() {
-    return GridView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      itemCount: 20,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 1.72,
-      ),
-      itemBuilder: (context, index) {
-        final int number = index + 1;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const double crossSpacing = 8;
+        const double mainSpacing = 8;
+        const int columnCount = 5;
+        const int rowCount = 4;
 
-        return _NumberButton(
-          number: number,
-          throwType: selectedThrowType,
-          accentColor: accentColor,
-          onTap: () {
-            _submitNumber(number);
-          },
+        final double availableHeight = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : 240;
+        final double calculatedRowHeight =
+            (availableHeight - (mainSpacing * (rowCount - 1))) / rowCount;
+        final double rowHeight = calculatedRowHeight < 28
+            ? 28
+            : calculatedRowHeight > 74
+                ? 74
+                : calculatedRowHeight;
+
+        return Column(
+          children: List.generate(rowCount, (rowIndex) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: rowIndex == rowCount - 1 ? 0 : mainSpacing,
+              ),
+              child: Row(
+                children: List.generate(columnCount, (columnIndex) {
+                  final int number = (rowIndex * columnCount) + columnIndex + 1;
+
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        right: columnIndex == columnCount - 1 ? 0 : crossSpacing,
+                      ),
+                      child: SizedBox(
+                        height: rowHeight,
+                        child: _NumberButton(
+                          number: number,
+                          throwType: selectedThrowType,
+                          accentColor: accentColor,
+                          onTap: () {
+                            _submitNumber(number);
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            );
+          }),
         );
       },
     );

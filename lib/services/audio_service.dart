@@ -443,11 +443,20 @@ class AudioService {
   Future<void> announceTurnScore({
     required String playerName,
     required int turnScore,
+    bool isClassic = false,
   }) async {
     await playEvent(
       AudioEventType.turnScore,
       waitForCompletion: true,
     );
+
+    if (isClassic) {
+      final bool playedClassic = await _playDefaultClassicAsset();
+
+      if (playedClassic) {
+        return;
+      }
+    }
 
     final bool playedNumber = await _playDefaultNumberAsset(turnScore);
 
@@ -456,7 +465,7 @@ class AudioService {
     }
 
     await speak(
-      '$playerName wirft $turnScore Punkte.',
+      isClassic ? '$playerName wirft Classic.' : '$playerName wirft $turnScore Punkte.',
     );
   }
 
@@ -620,6 +629,27 @@ class AudioService {
     await _voicePackQueue;
 
     return playedRequire;
+  }
+
+  Future<bool> _playDefaultClassicAsset() async {
+    await load();
+
+    if (!_settings.audioEnabled) {
+      return false;
+    }
+
+    bool playedClassic = false;
+
+    _voicePackQueue = _voicePackQueue.then((_) async {
+      playedClassic = await _playAssetFile(
+        '$_defaultPackAssetBasePath/classic.mp3',
+        waitForCompletion: true,
+      );
+    });
+
+    await _voicePackQueue;
+
+    return playedClassic;
   }
 
   Future<bool> _playDefaultNumberAsset(int number) async {

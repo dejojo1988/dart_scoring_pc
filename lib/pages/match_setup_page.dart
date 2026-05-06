@@ -1230,88 +1230,125 @@ class _PlayerCard extends StatelessWidget {
             ? Icons.person_pin_rounded
             : Icons.person_rounded;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF141A22),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isProfile || isBot ? accentColor : const Color(0xFF2A3545),
-          width: isProfile || isBot ? 1.4 : 1,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 10,
-            top: 10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: isProfile || isBot
-                    ? accentColor.withValues(alpha:0.14)
-                    : const Color(0xFF243040),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                badgeLabel,
-                style: TextStyle(
-                  color:
-                      isProfile || isBot ? accentColor : const Color(0xFF9DA8B7),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool compact = constraints.maxHeight < 112;
+        final double iconSize = compact ? 26 : 34;
+        final double nameSize = compact ? 14 : 18;
+        final double badgeFontSize = compact ? 9 : 11;
+        final double badgeHorizontalPadding = compact ? 6 : 8;
+        final double badgeVerticalPadding = compact ? 3 : 4;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF141A22),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: isProfile || isBot ? accentColor : const Color(0xFF2A3545),
+              width: isProfile || isBot ? 1.4 : 1,
             ),
           ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    color: accentColor,
-                    size: 34,
+          child: Stack(
+            children: [
+              Positioned(
+                left: compact ? 7 : 10,
+                top: compact ? 7 : 10,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: badgeHorizontalPadding,
+                    vertical: badgeVerticalPadding,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    player.name,
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 18,
+                  decoration: BoxDecoration(
+                    color: isProfile || isBot
+                        ? accentColor.withValues(alpha: 0.14)
+                        : const Color(0xFF243040),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badgeLabel,
+                    style: TextStyle(
+                      color: isProfile || isBot
+                          ? accentColor
+                          : const Color(0xFF9DA8B7),
+                      fontSize: badgeFontSize,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  if (isBot) ...[
-                    const SizedBox(height: 5),
-                    const Text(
-                      'Adaptive KI',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Color(0xFF9DA8B7),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
-            ),
+              Positioned(
+                right: compact ? 3 : 6,
+                top: compact ? 3 : 6,
+                child: IconButton(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.close_rounded),
+                  color: const Color(0xFF9DA8B7),
+                  tooltip: 'Entfernen',
+                  iconSize: compact ? 18 : 22,
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints.tightFor(
+                    width: compact ? 30 : 36,
+                    height: compact ? 30 : 36,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    compact ? 8 : 12,
+                    compact ? 26 : 34,
+                    compact ? 8 : 12,
+                    compact ? 7 : 12,
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          icon,
+                          color: accentColor,
+                          size: iconSize,
+                        ),
+                        SizedBox(height: compact ? 4 : 8),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: constraints.maxWidth - (compact ? 20 : 28),
+                          ),
+                          child: Text(
+                            player.name,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: nameSize,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        if (isBot && !compact) ...[
+                          const SizedBox(height: 5),
+                          const Text(
+                            'Adaptive KI',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Color(0xFF9DA8B7),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          Positioned(
-            right: 6,
-            top: 6,
-            child: IconButton(
-              onPressed: onRemove,
-              icon: const Icon(Icons.close_rounded),
-              color: const Color(0xFF9DA8B7),
-              tooltip: 'Entfernen',
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1372,90 +1409,120 @@ class _AvailablePlayerCard extends StatelessWidget {
     final bool isProfile = badgeText == 'Profil';
     final Color accentColor = Theme.of(context).colorScheme.primary;
 
-    return Material(
-      color: isSelected ? accentColor : const Color(0xFF141A22),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool compact = constraints.maxHeight < 112;
+        final double iconSize = compact ? 26 : 34;
+        final double nameSize = compact ? 14 : 17;
+        final double badgeFontSize = compact ? 9 : 10;
+
+        return Material(
+          color: isSelected ? accentColor : const Color(0xFF141A22),
+          borderRadius: BorderRadius.circular(22),
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: isSelected
-                  ? accentColor
-                  : isProfile
-                      ? accentColor.withValues(alpha:0.55)
-                      : const Color(0xFF2A3545),
-              width: 1.4,
-            ),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFF06100B).withValues(alpha:0.14)
-                        : isProfile
-                            ? accentColor.withValues(alpha:0.14)
-                            : const Color(0xFF243040),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    badgeText,
-                    style: TextStyle(
-                      color: isSelected
-                          ? const Color(0xFF06100B)
-                          : isProfile
-                              ? accentColor
-                              : const Color(0xFF9DA8B7),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+            child: Container(
+              padding: EdgeInsets.all(compact ? 8 : 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: isSelected
+                      ? accentColor
+                      : isProfile
+                          ? accentColor.withValues(alpha: 0.55)
+                          : const Color(0xFF2A3545),
+                  width: 1.4,
                 ),
               ),
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isSelected
-                          ? Icons.check_circle_rounded
-                          : isProfile
-                              ? Icons.person_pin_rounded
-                              : Icons.person_rounded,
-                      color: isSelected ? const Color(0xFF06100B) : accentColor,
-                      size: 34,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      player.name,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 6 : 8,
+                        vertical: compact ? 3 : 4,
+                      ),
+                      decoration: BoxDecoration(
                         color: isSelected
-                            ? const Color(0xFF06100B)
-                            : const Color(0xFFEAF1F8),
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
+                            ? const Color(0xFF06100B).withValues(alpha: 0.14)
+                            : isProfile
+                                ? accentColor.withValues(alpha: 0.14)
+                                : const Color(0xFF243040),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: TextStyle(
+                          color: isSelected
+                              ? const Color(0xFF06100B)
+                              : isProfile
+                                  ? accentColor
+                                  : const Color(0xFF9DA8B7),
+                          fontSize: badgeFontSize,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  Center(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        compact ? 4 : 6,
+                        compact ? 22 : 28,
+                        compact ? 4 : 6,
+                        compact ? 4 : 6,
+                      ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : isProfile
+                                      ? Icons.person_pin_rounded
+                                      : Icons.person_rounded,
+                              color: isSelected
+                                  ? const Color(0xFF06100B)
+                                  : accentColor,
+                              size: iconSize,
+                            ),
+                            SizedBox(height: compact ? 4 : 8),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    constraints.maxWidth - (compact ? 20 : 28),
+                              ),
+                              child: Text(
+                                player.name,
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? const Color(0xFF06100B)
+                                      : const Color(0xFFEAF1F8),
+                                  fontSize: nameSize,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

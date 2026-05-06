@@ -118,6 +118,15 @@ class _MatchSnapshot {
   final int currentLegNumber;
   final int currentTurnNumber;
   final bool turnStartedPlayerIsIn;
+  final int currentLegStartingPlayerIndex;
+  final Map<String, int> matchPointsScored;
+  final Map<String, int> matchDartsThrown;
+  final Map<String, int> legPointsScored;
+  final Map<String, int> legDartsThrown;
+  final Map<String, int> matchClassicCounts;
+  final Map<String, int> legClassicCounts;
+  final Map<String, int> lastTurnScore;
+  final Map<String, String> lastTurnText;
   final String message;
   final bool matchFinished;
   final Player? matchWinner;
@@ -136,6 +145,15 @@ class _MatchSnapshot {
     required this.currentLegNumber,
     required this.currentTurnNumber,
     required this.turnStartedPlayerIsIn,
+    required this.currentLegStartingPlayerIndex,
+    required this.matchPointsScored,
+    required this.matchDartsThrown,
+    required this.legPointsScored,
+    required this.legDartsThrown,
+    required this.matchClassicCounts,
+    required this.legClassicCounts,
+    required this.lastTurnScore,
+    required this.lastTurnText,
     required this.message,
     required this.matchFinished,
     required this.matchWinner,
@@ -155,7 +173,16 @@ class _MatchPageState extends State<MatchPage> {
   late String matchId;
   late int currentLegNumber;
   late int currentTurnNumber;
+  late int currentLegStartingPlayerIndex;
   late bool turnStartedPlayerIsIn;
+  late Map<String, int> matchPointsScored;
+  late Map<String, int> matchDartsThrown;
+  late Map<String, int> legPointsScored;
+  late Map<String, int> legDartsThrown;
+  late Map<String, int> matchClassicCounts;
+  late Map<String, int> legClassicCounts;
+  late Map<String, int> lastTurnScore;
+  late Map<String, String> lastTurnText;
 
   final List<DartThrow> currentTurnDarts = [];
   final List<_DartTurnRecord> recordedTurns = [];
@@ -194,6 +221,7 @@ class _MatchPageState extends State<MatchPage> {
     );
 
     activePlayerIndex = startIndex >= 0 ? startIndex : 0;
+    currentLegStartingPlayerIndex = activePlayerIndex;
     matchId = 'match_${DateTime.now().millisecondsSinceEpoch}';
     currentLegNumber = 1;
     currentTurnNumber = 1;
@@ -217,6 +245,38 @@ class _MatchPageState extends State<MatchPage> {
     playerIsIn = {
       for (final player in widget.players)
         player.id: widget.settings.inMode == InMode.straightIn,
+    };
+
+    matchPointsScored = {
+      for (final player in widget.players) player.id: 0,
+    };
+
+    matchDartsThrown = {
+      for (final player in widget.players) player.id: 0,
+    };
+
+    legPointsScored = {
+      for (final player in widget.players) player.id: 0,
+    };
+
+    legDartsThrown = {
+      for (final player in widget.players) player.id: 0,
+    };
+
+    matchClassicCounts = {
+      for (final player in widget.players) player.id: 0,
+    };
+
+    legClassicCounts = {
+      for (final player in widget.players) player.id: 0,
+    };
+
+    lastTurnScore = {
+      for (final player in widget.players) player.id: 0,
+    };
+
+    lastTurnText = {
+      for (final player in widget.players) player.id: '-',
     };
 
     turnStartScore =
@@ -435,6 +495,15 @@ class _MatchPageState extends State<MatchPage> {
         currentLegNumber: currentLegNumber,
         currentTurnNumber: currentTurnNumber,
         turnStartedPlayerIsIn: turnStartedPlayerIsIn,
+        currentLegStartingPlayerIndex: currentLegStartingPlayerIndex,
+        matchPointsScored: Map<String, int>.from(matchPointsScored),
+        matchDartsThrown: Map<String, int>.from(matchDartsThrown),
+        legPointsScored: Map<String, int>.from(legPointsScored),
+        legDartsThrown: Map<String, int>.from(legDartsThrown),
+        matchClassicCounts: Map<String, int>.from(matchClassicCounts),
+        legClassicCounts: Map<String, int>.from(legClassicCounts),
+        lastTurnScore: Map<String, int>.from(lastTurnScore),
+        lastTurnText: Map<String, String>.from(lastTurnText),
         message: message,
         matchFinished: matchFinished,
         matchWinner: matchWinner,
@@ -795,6 +864,7 @@ class _MatchPageState extends State<MatchPage> {
         player: player,
         turnScore: turnScore,
         isBust: isBust,
+        isClassicTurn: _isClassicTurn(darts),
         onFinished: () {
           _moveToNextPlayer(customMessage: customMessage);
         },
@@ -818,11 +888,145 @@ class _MatchPageState extends State<MatchPage> {
         player: player,
         turnScore: turnScore,
         isBust: false,
+        isClassicTurn: _isClassicTurn(darts),
         onFinished: () {
           _handleLegWin(player);
         },
       ),
     );
+  }
+
+  void _applyLiveTurnStats({
+    required Player player,
+    required int turnScore,
+    required List<DartThrow> darts,
+    required bool isBust,
+  }) {
+    final int dartCount = darts.length;
+
+    if (dartCount <= 0) {
+      return;
+    }
+
+    final int safeScore = turnScore < 0
+        ? 0
+        : turnScore > 180
+            ? 180
+            : turnScore;
+
+    matchPointsScored[player.id] =
+        (matchPointsScored[player.id] ?? 0) + safeScore;
+    matchDartsThrown[player.id] =
+        (matchDartsThrown[player.id] ?? 0) + dartCount;
+    legPointsScored[player.id] = (legPointsScored[player.id] ?? 0) + safeScore;
+    legDartsThrown[player.id] = (legDartsThrown[player.id] ?? 0) + dartCount;
+    lastTurnScore[player.id] = safeScore;
+
+    final String dartLabels = darts.map((dartThrow) => dartThrow.label).join(' · ');
+    final bool isClassic = !isBust && _isClassicTurn(darts);
+
+    if (isClassic) {
+      matchClassicCounts[player.id] = (matchClassicCounts[player.id] ?? 0) + 1;
+      legClassicCounts[player.id] = (legClassicCounts[player.id] ?? 0) + 1;
+    }
+
+    if (isBust) {
+      lastTurnText[player.id] = 'Bust · $dartLabels';
+    } else if (isClassic) {
+      lastTurnText[player.id] = 'Classic · $dartLabels';
+    } else {
+      lastTurnText[player.id] = '$safeScore · $dartLabels';
+    }
+  }
+
+  bool _isClassicTurn(List<DartThrow> darts) {
+    if (darts.length != 3) {
+      return false;
+    }
+
+    final List<int> classicNumbers = [];
+
+    for (final DartThrow dartThrow in darts) {
+      if (dartThrow.type != DartThrowType.single || dartThrow.number == null) {
+        return false;
+      }
+
+      classicNumbers.add(dartThrow.number!);
+    }
+
+    classicNumbers.sort();
+
+    return classicNumbers[0] == 1 &&
+        classicNumbers[1] == 5 &&
+        classicNumbers[2] == 20;
+  }
+
+  double _averageForPlayer({
+    required Player player,
+    required Map<String, int> points,
+    required Map<String, int> darts,
+  }) {
+    final int pointCount = points[player.id] ?? 0;
+    final int dartCount = darts[player.id] ?? 0;
+
+    if (dartCount <= 0) {
+      return 0;
+    }
+
+    return pointCount / dartCount * 3;
+  }
+
+  double _matchAverageForPlayer(Player player) {
+    return _averageForPlayer(
+      player: player,
+      points: matchPointsScored,
+      darts: matchDartsThrown,
+    );
+  }
+
+  double _legAverageForPlayer(Player player) {
+    return _averageForPlayer(
+      player: player,
+      points: legPointsScored,
+      darts: legDartsThrown,
+    );
+  }
+
+  String _lastTurnTextForPlayer(Player player) {
+    final String text = lastTurnText[player.id] ?? '-';
+    return text.trim().isEmpty ? '-' : text;
+  }
+
+  int _classicCountForPlayer(Player player) {
+    return matchClassicCounts[player.id] ?? 0;
+  }
+
+  String? _statusTextForPlayer(Player player) {
+    if (player.id != activePlayer.id || matchFinished) {
+      return null;
+    }
+
+    if (turnIntroAnnouncementRunning) {
+      return 'Ansage läuft · Wurf gesperrt';
+    }
+
+    if (turnSummaryRunning) {
+      return 'Aufnahme wird abgeschlossen';
+    }
+
+    if (activePlayerIsBot || botTurnRunning) {
+      return botDisplayStatus;
+    }
+
+    return message;
+  }
+
+  String? _botInfoForPlayer(Player player) {
+    if (!_isBotPlayer(player)) {
+      return null;
+    }
+
+    return '${botOpponentService.skillProfile.levelLabel} · Ziel-Ø ${botOpponentService.skillProfile.targetAverage.toStringAsFixed(1)}';
   }
 
   void _showTurnSummary({
@@ -836,19 +1040,31 @@ class _MatchPageState extends State<MatchPage> {
     }
 
     setState(() {
+      _applyLiveTurnStats(
+        player: player,
+        turnScore: turnScore,
+        darts: darts,
+        isBust: isBust,
+      );
+
       turnSummaryRunning = true;
       turnSummaryIsBust = isBust;
       turnSummaryPlayerName = player.name;
       turnSummaryScore = turnScore.clamp(0, 180).toInt();
       turnSummaryDarts = List<DartThrow>.from(darts);
+      final bool isClassic = !isBust && _isClassicTurn(darts);
       turnSummaryTitle = isBust
           ? 'BUST'
-          : _isBotPlayer(player)
-              ? 'BOT-AUFNAHME'
-              : 'AUFNAHME';
+          : isClassic
+              ? 'CLASSIC'
+              : _isBotPlayer(player)
+                  ? 'BOT-AUFNAHME'
+                  : 'AUFNAHME';
       turnSummarySubtitle = isBust
           ? '${player.name} hat sich überworfen.'
-          : '${player.name} wirft $turnScore Punkte.';
+          : isClassic
+              ? '${player.name} wirft Classic.'
+              : '${player.name} wirft $turnScore Punkte.';
       message = turnSummarySubtitle;
     });
   }
@@ -857,6 +1073,7 @@ class _MatchPageState extends State<MatchPage> {
     required Player player,
     required int turnScore,
     required bool isBust,
+    required bool isClassicTurn,
     required VoidCallback onFinished,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 450));
@@ -873,6 +1090,7 @@ class _MatchPageState extends State<MatchPage> {
       await AudioService.instance.announceTurnScore(
         playerName: _audioLabelForPlayer(player),
         turnScore: turnScore,
+        isClassic: isClassicTurn,
       );
     }
 
@@ -1151,7 +1369,7 @@ class _MatchPageState extends State<MatchPage> {
       return;
     }
 
-    _resetScoresForNextLeg(winner);
+    _resetScoresForNextLeg();
   }
 
   Future<void> _announceSetWinThenStartNextLeg(Player winner) async {
@@ -1164,10 +1382,10 @@ class _MatchPageState extends State<MatchPage> {
     }
 
     _resetLegsForNextSet();
-    _resetScoresForNextLeg(winner);
+    _resetScoresForNextLeg();
   }
 
-  void _resetScoresForNextLeg(Player startingPlayer) {
+  void _resetScoresForNextLeg() {
     if (!mounted) {
       return;
     }
@@ -1192,14 +1410,17 @@ class _MatchPageState extends State<MatchPage> {
       for (final player in widget.players) {
         remainingScores[player.id] = widget.settings.startScore;
         playerIsIn[player.id] = widget.settings.inMode == InMode.straightIn;
+        legPointsScored[player.id] = 0;
+        legDartsThrown[player.id] = 0;
+        legClassicCounts[player.id] = 0;
+        lastTurnScore[player.id] = 0;
+        lastTurnText[player.id] = '-';
       }
 
-      final int startingPlayerIndex = widget.players.indexWhere(
-        (player) => player.id == startingPlayer.id,
-      );
-
-      if (startingPlayerIndex >= 0) {
-        activePlayerIndex = startingPlayerIndex;
+      if (widget.players.isNotEmpty) {
+        currentLegStartingPlayerIndex =
+            (currentLegStartingPlayerIndex + 1) % widget.players.length;
+        activePlayerIndex = currentLegStartingPlayerIndex;
       }
 
       turnStartScore =
@@ -1279,6 +1500,15 @@ class _MatchPageState extends State<MatchPage> {
       currentLegNumber = snapshot.currentLegNumber;
       currentTurnNumber = snapshot.currentTurnNumber;
       turnStartedPlayerIsIn = snapshot.turnStartedPlayerIsIn;
+      currentLegStartingPlayerIndex = snapshot.currentLegStartingPlayerIndex;
+      matchPointsScored = Map<String, int>.from(snapshot.matchPointsScored);
+      matchDartsThrown = Map<String, int>.from(snapshot.matchDartsThrown);
+      legPointsScored = Map<String, int>.from(snapshot.legPointsScored);
+      legDartsThrown = Map<String, int>.from(snapshot.legDartsThrown);
+      matchClassicCounts = Map<String, int>.from(snapshot.matchClassicCounts);
+      legClassicCounts = Map<String, int>.from(snapshot.legClassicCounts);
+      lastTurnScore = Map<String, int>.from(snapshot.lastTurnScore);
+      lastTurnText = Map<String, String>.from(snapshot.lastTurnText);
       message = snapshot.message;
       matchFinished = snapshot.matchFinished;
       matchWinner = snapshot.matchWinner;
@@ -1593,14 +1823,22 @@ class _MatchPageState extends State<MatchPage> {
               itemBuilder: (context, index) {
                 final Player player = visiblePlayers[index];
 
+                final bool isActiveCard = index == 0 && !matchFinished;
+
                 return PlayerScoreCard(
                   player: player,
                   remainingScore:
                       remainingScores[player.id] ?? widget.settings.startScore,
-                  isActive: index == 0 && !matchFinished,
+                  isActive: isActiveCard,
                   legsWon: legsWon[player.id] ?? 0,
                   setsWon: setsWon[player.id] ?? 0,
-                  checkoutText: _checkoutTextForPlayer(player),
+                  checkoutText: isActiveCard ? _checkoutTextForPlayer(player) : null,
+                  matchAverage: _matchAverageForPlayer(player),
+                  legAverage: _legAverageForPlayer(player),
+                  classicCount: _classicCountForPlayer(player),
+                  lastTurnText: _lastTurnTextForPlayer(player),
+                  botInfoText: _botInfoForPlayer(player),
+                  statusText: _statusTextForPlayer(player),
                 );
               },
             ),
@@ -1636,86 +1874,112 @@ class _MatchPageState extends State<MatchPage> {
   Widget _buildTurnIntroAnnouncementBlocker() {
     final int scoreToAnnounce = activeRemainingScore;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      width: double.infinity,
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: accentColor,
-          width: 2.0,
-        ),
-        boxShadow: [
-          BoxShadow(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool compact = constraints.maxHeight < 520;
+        final double iconSize = compact ? 68 : 92;
+        final double titleSize = compact ? 26 : 34;
+        final double scoreSize = compact ? 58 : 82;
+        final double padding = compact ? 18 : 26;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          width: double.infinity,
+          padding: EdgeInsets.all(padding),
+          decoration: BoxDecoration(
             color: accentColor.withValues(alpha: 0.16),
-            blurRadius: 26,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 92,
-            height: 92,
-            decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
               color: accentColor,
-              borderRadius: BorderRadius.circular(30),
+              width: 2.0,
             ),
-            child: const Icon(
-              Icons.campaign_rounded,
-              color: Color(0xFF06100B),
-              size: 52,
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.16),
+                blurRadius: 26,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: iconSize,
+                    height: iconSize,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.circular(compact ? 24 : 30),
+                    ),
+                    child: Icon(
+                      Icons.campaign_rounded,
+                      color: const Color(0xFF06100B),
+                      size: compact ? 40 : 52,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 14 : 20),
+                  Text(
+                    'CHECKOUT-ANSAGE',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${activePlayer.name} benötigt $scoreToAnnounce Punkte.',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: compact ? 17 : 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 12 : 18),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '$scoreToAnnounce',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: accentColor,
+                        fontSize: scoreSize,
+                        height: 0.95,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'WURF WIRD NACH DER ANSAGE FREIGEGEBEN',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Color(0xFFEAF1F8),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 20),
-          const Text(
-            'CHECKOUT-ANSAGE',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${activePlayer.name} benötigt $scoreToAnnounce Punkte.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: accentColor,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            '$scoreToAnnounce',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: accentColor,
-              fontSize: 82,
-              height: 0.95,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'WURF WIRD NACH DER ANSAGE FREIGEGEBEN',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFFEAF1F8),
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.1,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1724,214 +1988,262 @@ class _MatchPageState extends State<MatchPage> {
         ? const Color(0xFFFF5C77)
         : const Color(0xFFFFB020);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      width: double.infinity,
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: summaryColor.withValues(alpha:0.18),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: summaryColor,
-          width: 2.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: summaryColor.withValues(alpha:0.18),
-            blurRadius: 26,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 92,
-            height: 92,
-            decoration: BoxDecoration(
-              color: summaryColor,
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Icon(
-              turnSummaryIsBust
-                  ? Icons.warning_rounded
-                  : Icons.campaign_rounded,
-              color: const Color(0xFF06100B),
-              size: 52,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            turnSummaryTitle,
-            style: const TextStyle(
-              fontSize: 38,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            turnSummarySubtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: summaryColor,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            '$turnSummaryScore',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: summaryColor,
-              fontSize: 82,
-              height: 0.95,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'PUNKTE',
-            style: TextStyle(
-              color: Color(0xFFEAF1F8),
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.8,
-            ),
-          ),
-          const SizedBox(height: 26),
-          Row(
-            children: List.generate(3, (index) {
-              final DartThrow? dartThrow = index < turnSummaryDarts.length
-                  ? turnSummaryDarts[index]
-                  : null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool compact = constraints.maxHeight < 560;
+        final double iconSize = compact ? 64 : 92;
+        final double titleSize = compact ? 28 : 38;
+        final double scoreSize = compact ? 58 : 82;
+        final double padding = compact ? 18 : 26;
 
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: index == 2 ? 0 : 12,
-                  ),
-                  child: _TurnSummaryDartCard(
-                    dartThrow: dartThrow,
-                    throwIndex: index + 1,
-                    summaryColor: summaryColor,
-                  ),
-                ),
-              );
-            }),
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          width: double.infinity,
+          padding: EdgeInsets.all(padding),
+          decoration: BoxDecoration(
+            color: summaryColor.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: summaryColor,
+              width: 2.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: summaryColor.withValues(alpha: 0.18),
+                blurRadius: 26,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ],
-      ),
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: iconSize,
+                    height: iconSize,
+                    decoration: BoxDecoration(
+                      color: summaryColor,
+                      borderRadius: BorderRadius.circular(compact ? 22 : 30),
+                    ),
+                    child: Icon(
+                      turnSummaryIsBust
+                          ? Icons.warning_rounded
+                          : Icons.campaign_rounded,
+                      color: const Color(0xFF06100B),
+                      size: compact ? 38 : 52,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 12 : 20),
+                  Text(
+                    turnSummaryTitle,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    turnSummarySubtitle,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: summaryColor,
+                      fontSize: compact ? 17 : 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 12 : 18),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '$turnSummaryScore',
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: summaryColor,
+                        fontSize: scoreSize,
+                        height: 0.95,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'PUNKTE',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFFEAF1F8),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.8,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 16 : 26),
+                  Row(
+                    children: List.generate(3, (index) {
+                      final DartThrow? dartThrow = index < turnSummaryDarts.length
+                          ? turnSummaryDarts[index]
+                          : null;
+
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: index == 2 ? 0 : 10,
+                          ),
+                          child: _TurnSummaryDartCard(
+                            dartThrow: dartThrow,
+                            throwIndex: index + 1,
+                            summaryColor: summaryColor,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildBotInputBlocker() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101720),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: const Color(0xFF243040),
-          width: 1.2,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 92,
-            height: 92,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha:0.13),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: accentColor.withValues(alpha:0.35),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool compact = constraints.maxHeight < 560;
+        final double iconSize = compact ? 64 : 92;
+        final double titleSize = compact ? 28 : 38;
+        final double padding = compact ? 18 : 26;
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(padding),
+          decoration: BoxDecoration(
+            color: const Color(0xFF101720),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: const Color(0xFF243040),
+              width: 1.2,
+            ),
+          ),
+          child: Center(
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: iconSize,
+                    height: iconSize,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.13),
+                      borderRadius: BorderRadius.circular(compact ? 22 : 30),
+                      border: Border.all(
+                        color: accentColor.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.smart_toy_rounded,
+                      color: accentColor,
+                      size: compact ? 38 : 52,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 12 : 20),
+                  Text(
+                    'BOT WIRFT',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    botDisplayStatus,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: compact ? 17 : 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Level ${botOpponentService.skillProfile.levelLabel} · simuliert nach Spieler-Statistik',
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF9DA8B7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 16 : 26),
+                  Row(
+                    children: List.generate(3, (index) {
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: index == 2 ? 0 : 10,
+                          ),
+                          child: _BotThrowDisplayCard(
+                            dartThrow: botDisplayDarts[index],
+                            throwIndex: index + 1,
+                            isActive: activeBotDisplayIndex == index && botTurnRunning,
+                            accentColor: accentColor,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  SizedBox(height: compact ? 16 : 24),
+                  SizedBox(
+                    width: 320,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: botTurnRunning ? null : _maybeStartBotTurn,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: Text(botTurnRunning ? 'Bot wirft...' : 'Botwurf starten'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                        foregroundColor: const Color(0xFF06100B),
+                        disabledBackgroundColor: const Color(0xFF243040),
+                        disabledForegroundColor: const Color(0xFF9DA8B7),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Icon(
-              Icons.smart_toy_rounded,
-              color: accentColor,
-              size: 52,
-            ),
           ),
-          const SizedBox(height: 20),
-          const Text(
-            'BOT WIRFT',
-            style: TextStyle(
-              fontSize: 38,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            botDisplayStatus,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: accentColor,
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Level ${botOpponentService.skillProfile.levelLabel} · simuliert nach Spieler-Statistik',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF9DA8B7),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 26),
-          Row(
-            children: List.generate(3, (index) {
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    right: index == 2 ? 0 : 12,
-                  ),
-                  child: _BotThrowDisplayCard(
-                    dartThrow: botDisplayDarts[index],
-                    throwIndex: index + 1,
-                    isActive: activeBotDisplayIndex == index && botTurnRunning,
-                    accentColor: accentColor,
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: 320,
-            height: 56,
-            child: ElevatedButton.icon(
-              onPressed: botTurnRunning ? null : _maybeStartBotTurn,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(botTurnRunning ? 'Bot wirft...' : 'Botwurf starten'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
-                foregroundColor: const Color(0xFF06100B),
-                disabledBackgroundColor: const Color(0xFF243040),
-                disabledForegroundColor: const Color(0xFF9DA8B7),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                textStyle: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

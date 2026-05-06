@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set "VERSION=1.0.2.2-beta"
+set "VERSION=1.0.3.0-beta"
 set "INSTALLER_NAME=DartScoringPC-Setup-%VERSION%.exe"
 set "INNO_EXE="
 

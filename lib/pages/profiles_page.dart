@@ -1031,6 +1031,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
     final int highestFinish =
         (advancedX01Stats['highest_finish'] ?? 0).toInt();
     final int bustCount = (advancedX01Stats['bust_count'] ?? 0).toInt();
+    final int classicCount = (advancedX01Stats['classic_count'] ?? 0).toInt();
 
     final String bestLegValue = bestLegDarts <= 0 ? '-' : '$bestLegDarts Darts';
 
@@ -1149,6 +1150,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
               _StatPreviewCard(
                 label: 'Busts',
                 value: '$bustCount',
+              ),
+              _StatPreviewCard(
+                label: 'Classics',
+                value: '$classicCount',
               ),
               _StatPreviewCard(
                 label: 'Matches won',

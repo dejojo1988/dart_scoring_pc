@@ -795,6 +795,9 @@ class AppDatabase {
     final Map<String, int> doubleAttemptsByPlayer = {};
     final Map<String, int> doubleHitsByPlayer = {};
     final Map<String, int> bustsByPlayer = {};
+    final Map<String, List<String>> classicLabelsByTurn = {};
+    final Map<String, String> classicPlayerByTurn = {};
+    final Set<String> classicBustTurns = {};
     final Set<String> countedBustTurns = {};
     final Set<String> countedDirectFinishBustTurns = {};
 
@@ -826,6 +829,13 @@ class AppDatabase {
       dartsThrownByLeg[legKey] = dartsInLeg;
 
       final String bustTurnKey = '$playerId|$matchId|$legNumber|$turnNumber';
+
+      classicLabelsByTurn.putIfAbsent(bustTurnKey, () => <String>[]).add(dartLabel);
+      classicPlayerByTurn[bustTurnKey] = playerId;
+
+      if (isBust == 1) {
+        classicBustTurns.add(bustTurnKey);
+      }
 
       if (isBust == 1 && !countedBustTurns.contains(bustTurnKey)) {
         countedBustTurns.add(bustTurnKey);
@@ -880,6 +890,33 @@ class AppDatabase {
       }
     }
 
+    final Map<String, int> classicCountByPlayer = {};
+
+    for (final entry in classicLabelsByTurn.entries) {
+      if (classicBustTurns.contains(entry.key)) {
+        continue;
+      }
+
+      final List<String> labels = List<String>.from(entry.value)..sort();
+
+      final bool isClassic = labels.length == 3 &&
+          labels[0] == 'S1' &&
+          labels[1] == 'S20' &&
+          labels[2] == 'S5';
+
+      if (!isClassic) {
+        continue;
+      }
+
+      final String? playerId = classicPlayerByTurn[entry.key];
+
+      if (playerId == null) {
+        continue;
+      }
+
+      classicCountByPlayer[playerId] = (classicCountByPlayer[playerId] ?? 0) + 1;
+    }
+
     final Set<String> playerIds = {
       ...totalFirst9DartsByPlayer.keys,
       ...highestFinishByPlayer.keys,
@@ -889,6 +926,7 @@ class AppDatabase {
       ...doubleAttemptsByPlayer.keys,
       ...doubleHitsByPlayer.keys,
       ...bustsByPlayer.keys,
+      ...classicCountByPlayer.keys,
     };
 
     for (final playerId in playerIds) {
@@ -921,6 +959,7 @@ class AppDatabase {
         'double_hits': doubleHits,
         'double_percentage': doublePercentage,
         'bust_count': bustsByPlayer[playerId] ?? 0,
+        'classic_count': classicCountByPlayer[playerId] ?? 0,
       };
     }
 
@@ -1145,6 +1184,7 @@ class AppDatabase {
       'double_hits': 0,
       'double_percentage': 0,
       'bust_count': 0,
+      'classic_count': 0,
     };
   }
 
