@@ -28,6 +28,132 @@ class AppDatabase {
     return newDatabase;
   }
 
+
+  Future<Directory> getApplicationDataDirectory() async {
+    return _getDatabaseDirectory();
+  }
+
+  Future<Directory> getBackupDirectory() async {
+    final Directory databaseDirectory = await _getDatabaseDirectory();
+    final Directory backupDirectory = Directory(
+      path.join(
+        databaseDirectory.path,
+        _backupFolderName,
+      ),
+    );
+
+    await backupDirectory.create(recursive: true);
+    return backupDirectory;
+  }
+
+  Future<File> getDatabaseFile() async {
+    final Directory databaseDirectory = await _getDatabaseDirectory();
+
+    return File(
+      path.join(
+        databaseDirectory.path,
+        _databaseFileName,
+      ),
+    );
+  }
+
+  Future<List<DatabaseBackupInfo>> getDatabaseBackups() async {
+    final Directory backupDirectory = await getBackupDirectory();
+    final List<FileSystemEntity> entries = await backupDirectory.list().toList();
+
+    final List<DatabaseBackupInfo> backups = [];
+
+    for (final File file in entries.whereType<File>()) {
+      if (!path.basename(file.path).toLowerCase().endsWith('.db')) {
+        continue;
+      }
+
+      final FileStat stat = await file.stat();
+
+      backups.add(
+        DatabaseBackupInfo(
+          fileName: path.basename(file.path),
+          path: file.path,
+          sizeBytes: stat.size,
+          modifiedAt: stat.modified,
+        ),
+      );
+    }
+
+    backups.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
+    return backups;
+  }
+
+  Future<File> exportDatabaseBackup({required String targetDirectoryPath}) async {
+    final Database db = await database;
+    await _checkpointDatabaseIfPossible(db);
+
+    final File databaseFile = File(db.path);
+
+    if (!await databaseFile.exists()) {
+      throw FileSystemException(
+        'Datenbankdatei wurde nicht gefunden. Export wurde abgebrochen.',
+        db.path,
+      );
+    }
+
+    final Directory targetDirectory = Directory(targetDirectoryPath);
+
+    if (!await targetDirectory.exists()) {
+      throw FileSystemException(
+        'Zielordner wurde nicht gefunden. Export wurde abgebrochen.',
+        targetDirectoryPath,
+      );
+    }
+
+    final String exportPath = path.join(
+      targetDirectory.path,
+      'dart_scoring_pc_export_${_backupTimestamp()}.db',
+    );
+
+    return databaseFile.copy(exportPath);
+  }
+
+  Future<void> restoreDatabaseFromBackup({required String backupFilePath}) async {
+    final File backupFile = File(backupFilePath);
+
+    if (!await backupFile.exists()) {
+      throw FileSystemException(
+        'Backup-Datei wurde nicht gefunden. Wiederherstellung abgebrochen.',
+        backupFilePath,
+      );
+    }
+
+    if (!path.basename(backupFile.path).toLowerCase().endsWith('.db')) {
+      throw FileSystemException(
+        'Ungültige Backup-Datei. Es werden nur .db-Dateien akzeptiert.',
+        backupFilePath,
+      );
+    }
+
+    final File databaseFile = await getDatabaseFile();
+    final Database? openDatabase = _database;
+
+    if (openDatabase != null) {
+      await _checkpointDatabaseIfPossible(openDatabase);
+      await openDatabase.close();
+      _database = null;
+    }
+
+    if (await databaseFile.exists()) {
+      await _createDatabaseBackup(
+        databasePath: databaseFile.path,
+        reason: 'before_restore',
+        shouldCleanup: true,
+      );
+    }
+
+    await _deleteSQLiteSidecarFiles(databaseFile.path);
+    await backupFile.copy(databaseFile.path);
+
+    _database = null;
+  }
+
   Future<Database> _openDatabase() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
@@ -166,6 +292,30 @@ class AppDatabase {
     }
 
     return normalizedReason;
+  }
+
+
+  Future<void> _deleteSQLiteSidecarFiles(String databasePath) async {
+    final List<String> sidecarPaths = [
+      '$databasePath-wal',
+      '$databasePath-shm',
+      '$databasePath-journal',
+    ];
+
+    for (final String sidecarPath in sidecarPaths) {
+      final File sidecarFile = File(sidecarPath);
+
+      if (!await sidecarFile.exists()) {
+        continue;
+      }
+
+      try {
+        await sidecarFile.delete();
+      } catch (_) {
+        // Wenn eine Neben-Datei nicht existiert oder schon weg ist,
+        // darf die Wiederherstellung nicht daran scheitern.
+      }
+    }
   }
 
   Future<void> _cleanupOldBackups(Directory backupDirectory) async {
@@ -1009,5 +1159,38 @@ class AppDatabase {
       'score_140_plus_count': 0,
       'score_100_plus_count': 0,
     };
+  }
+}
+
+class DatabaseBackupInfo {
+  final String fileName;
+  final String path;
+  final int sizeBytes;
+  final DateTime modifiedAt;
+
+  const DatabaseBackupInfo({
+    required this.fileName,
+    required this.path,
+    required this.sizeBytes,
+    required this.modifiedAt,
+  });
+
+  String get displaySize {
+    if (sizeBytes >= 1024 * 1024) {
+      final double megabytes = sizeBytes / (1024 * 1024);
+      return '${megabytes.toStringAsFixed(1)} MB';
+    }
+
+    if (sizeBytes >= 1024) {
+      final double kilobytes = sizeBytes / 1024;
+      return '${kilobytes.toStringAsFixed(1)} KB';
+    }
+
+    return '$sizeBytes B';
+  }
+
+  String get displayDate {
+    return '${modifiedAt.day.toString().padLeft(2, '0')}.${modifiedAt.month.toString().padLeft(2, '0')}.${modifiedAt.year.toString().padLeft(4, '0')} '
+        '${modifiedAt.hour.toString().padLeft(2, '0')}:${modifiedAt.minute.toString().padLeft(2, '0')}:${modifiedAt.second.toString().padLeft(2, '0')}';
   }
 }

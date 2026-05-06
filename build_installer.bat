@@ -1,9 +1,9 @@
 @echo off
 setlocal
 
-set VERSION=1.0.2.1-beta
-set INSTALLER_NAME=DartScoringPC-Setup-%VERSION%.exe
-set INNO_EXE=
+set "VERSION=1.0.2.2-beta"
+set "INSTALLER_NAME=DartScoringPC-Setup-%VERSION%.exe"
+set "INNO_EXE="
 
 echo.
 echo ==========================================
@@ -16,24 +16,24 @@ echo [0/4] Suche Inno Setup Compiler...
 
 where iscc >nul 2>nul
 if not errorlevel 1 (
-    set INNO_EXE=iscc
+    set "INNO_EXE=iscc"
 )
 
 if "%INNO_EXE%"=="" (
     if exist "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" (
-        set INNO_EXE=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe
+        set "INNO_EXE=%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"
     )
 )
 
 if "%INNO_EXE%"=="" (
     if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" (
-        set INNO_EXE=C:\Program Files (x86)\Inno Setup 6\ISCC.exe
+        set "INNO_EXE=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
     )
 )
 
 if "%INNO_EXE%"=="" (
     if exist "C:\Program Files\Inno Setup 6\ISCC.exe" (
-        set INNO_EXE=C:\Program Files\Inno Setup 6\ISCC.exe
+        set "INNO_EXE=C:\Program Files\Inno Setup 6\ISCC.exe"
     )
 )
 
@@ -48,11 +48,11 @@ if "%INNO_EXE%"=="" (
 )
 
 echo Gefunden:
-echo %INNO_EXE%
+echo "%INNO_EXE%"
 
 echo.
 echo [1/4] Flutter Windows Release Build...
-flutter build windows --release
+call flutter build windows --release
 if errorlevel 1 (
     echo.
     echo FEHLER: Flutter Build fehlgeschlagen.

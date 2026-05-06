@@ -29,9 +29,19 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
       TextEditingController();
 
   String updateStatusText = 'Noch keine Update-Prüfung durchgeführt.';
+  String backupStatusText = 'Backups noch nicht geladen.';
+  String databasePathText = '';
+  String backupFolderPathText = '';
+
+  List<DatabaseBackupInfo> databaseBackups = const [];
+
   bool isLoading = true;
   bool isCheckingForUpdate = false;
   bool isDownloadingUpdate = false;
+  bool isCreatingDataBackup = false;
+  bool isExportingDataBackup = false;
+  bool isRestoringDataBackup = false;
+  bool isOpeningBackupFolder = false;
   double updateDownloadProgress = 0;
 
   @override
@@ -39,7 +49,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
     super.initState();
 
     tabController = TabController(
-      length: 3,
+      length: 4,
       vsync: this,
     );
 
@@ -58,6 +68,12 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
     await AppearanceService.instance.load();
     await UpdateService.instance.load();
 
+    final File databaseFile = await AppDatabase.instance.getDatabaseFile();
+    final Directory backupDirectory =
+        await AppDatabase.instance.getBackupDirectory();
+    final List<DatabaseBackupInfo> backups =
+        await AppDatabase.instance.getDatabaseBackups();
+
     if (!mounted) {
       return;
     }
@@ -67,6 +83,12 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
       appearanceSettings = AppearanceService.instance.settings;
       updateSettings = UpdateService.instance.settings;
       updateManifestController.text = updateSettings.manifestLocation;
+      databasePathText = databaseFile.path;
+      backupFolderPathText = backupDirectory.path;
+      databaseBackups = backups;
+      backupStatusText = backups.isEmpty
+          ? 'Noch keine Backups vorhanden.'
+          : '${backups.length} Backup(s) gefunden.';
       isLoading = false;
     });
   }
@@ -139,6 +161,278 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
     await AudioService.instance.speak(
       'Ansager-Test. Spieler 1 ist dran und braucht 170 Punkte. Spieler 1 wirft 60 Punkte.',
     );
+  }
+
+  bool get _isDataBackupBusy {
+    return isCreatingDataBackup ||
+        isExportingDataBackup ||
+        isRestoringDataBackup ||
+        isOpeningBackupFolder ||
+        isDownloadingUpdate ||
+        isCheckingForUpdate;
+  }
+
+  Future<void> _refreshDatabaseBackups() async {
+    final File databaseFile = await AppDatabase.instance.getDatabaseFile();
+    final Directory backupDirectory = await AppDatabase.instance.getBackupDirectory();
+    final List<DatabaseBackupInfo> backups =
+        await AppDatabase.instance.getDatabaseBackups();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      databasePathText = databaseFile.path;
+      backupFolderPathText = backupDirectory.path;
+      databaseBackups = backups;
+      backupStatusText = backups.isEmpty
+          ? 'Noch keine Backups vorhanden.'
+          : '${backups.length} Backup(s) gefunden.';
+    });
+  }
+
+  Future<void> _createDataBackupNow() async {
+    if (_isDataBackupBusy) {
+      return;
+    }
+
+    setState(() {
+      isCreatingDataBackup = true;
+      backupStatusText = 'Erstelle manuelles Backup...';
+    });
+
+    try {
+      final File backupFile = await AppDatabase.instance.createManualBackup(
+        reason: 'manual_settings',
+      );
+
+      await _refreshDatabaseBackups();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        backupStatusText = 'Backup erstellt: ${_displayPath(backupFile.path)}';
+      });
+
+      _showMessage('Backup erstellt: ${_displayPath(backupFile.path)}');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        backupStatusText = 'Backup fehlgeschlagen: $error';
+      });
+
+      _showMessage('Backup fehlgeschlagen: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isCreatingDataBackup = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openBackupFolder() async {
+    if (_isDataBackupBusy) {
+      return;
+    }
+
+    setState(() {
+      isOpeningBackupFolder = true;
+      backupStatusText = 'Öffne Backup-Ordner...';
+    });
+
+    try {
+      final Directory backupDirectory = await AppDatabase.instance.getBackupDirectory();
+
+      if (Platform.isWindows) {
+        await Process.run('explorer', [backupDirectory.path]);
+      } else {
+        throw UnsupportedError('Ordner öffnen wird aktuell nur unter Windows unterstützt.');
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        backupFolderPathText = backupDirectory.path;
+        backupStatusText = 'Backup-Ordner geöffnet.';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        backupStatusText = 'Backup-Ordner konnte nicht geöffnet werden: $error';
+      });
+
+      _showMessage('Backup-Ordner konnte nicht geöffnet werden: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isOpeningBackupFolder = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _exportDatabaseBackup() async {
+    if (_isDataBackupBusy) {
+      return;
+    }
+
+    final String? targetDirectoryPath = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Export-Ziel für Datenbank auswählen',
+    );
+
+    if (targetDirectoryPath == null || targetDirectoryPath.trim().isEmpty) {
+      return;
+    }
+
+    setState(() {
+      isExportingDataBackup = true;
+      backupStatusText = 'Exportiere Datenbank...';
+    });
+
+    try {
+      final File exportFile = await AppDatabase.instance.exportDatabaseBackup(
+        targetDirectoryPath: targetDirectoryPath,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        backupStatusText = 'Datenbank exportiert: ${exportFile.path}';
+      });
+
+      _showMessage('Datenbank exportiert: ${_displayPath(exportFile.path)}');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        backupStatusText = 'Export fehlgeschlagen: $error';
+      });
+
+      _showMessage('Export fehlgeschlagen: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isExportingDataBackup = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickAndRestoreDatabaseBackup() async {
+    if (_isDataBackupBusy) {
+      return;
+    }
+
+    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['db'],
+      allowMultiple: false,
+      dialogTitle: 'Datenbank-Backup wiederherstellen',
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+
+    final String? backupFilePath = result.files.single.path;
+
+    if (backupFilePath == null || backupFilePath.trim().isEmpty) {
+      _showMessage('Die Backup-Datei konnte nicht gelesen werden.');
+      return;
+    }
+
+    await _restoreDatabaseBackup(backupFilePath);
+  }
+
+  Future<void> _restoreDatabaseBackup(String backupFilePath) async {
+    if (_isDataBackupBusy) {
+      return;
+    }
+
+    final bool confirmed = await _showConfirmDialog(
+      title: 'Backup wiederherstellen?',
+      message:
+          'Die aktuelle Datenbank wird vorher automatisch gesichert. Danach wird dieses Backup als aktive Datenbank eingesetzt. Die App sollte danach neu gestartet werden.',
+      confirmLabel: 'Wiederherstellen',
+      danger: true,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setState(() {
+      isRestoringDataBackup = true;
+      backupStatusText = 'Stelle Backup wieder her...';
+    });
+
+    try {
+      await AppDatabase.instance.restoreDatabaseFromBackup(
+        backupFilePath: backupFilePath,
+      );
+
+      await _refreshDatabaseBackups();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        backupStatusText =
+            'Backup wiederhergestellt. Bitte App neu starten, damit alle Ansichten die Daten neu laden.';
+      });
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF101720),
+            title: const Text('Backup wiederhergestellt'),
+            content: const Text(
+              'Die Datenbank wurde wiederhergestellt. Starte die App jetzt neu, damit Profile und Statistiken überall sauber neu geladen werden.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        backupStatusText = 'Wiederherstellung fehlgeschlagen: $error';
+      });
+
+      _showMessage('Wiederherstellung fehlgeschlagen: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isRestoringDataBackup = false;
+        });
+      }
+    }
   }
 
   Future<void> _saveUpdateSettings() async {
@@ -275,6 +569,41 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
     }
   }
 
+  Future<bool> _showConfirmDialog({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    bool danger = false,
+  }) async {
+    final bool? result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF101720),
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Abbrechen'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    danger ? const Color(0xFFFF5C77) : accentColor,
+                foregroundColor: const Color(0xFF06100B),
+              ),
+              child: Text(confirmLabel),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
   String _displayPath(String? path) {
     if (path == null || path.trim().isEmpty) {
       return 'Keine Datei ausgewählt';
@@ -341,6 +670,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                             _buildAudioTab(liveAccentColor),
                             _buildAppearanceTab(liveAccentColor),
                             _buildUpdateTab(liveAccentColor),
+                            _buildDataBackupTab(liveAccentColor),
                           ],
                         ),
                 ),
@@ -466,6 +796,17 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                 Icon(Icons.system_update_alt_rounded, size: 22),
                 SizedBox(width: 8),
                 Text('Update'),
+              ],
+            ),
+          ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.backup_rounded, size: 22),
+                SizedBox(width: 8),
+                Text('Backup'),
               ],
             ),
           ),
@@ -1049,8 +1390,306 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
     );
   }
 
+
+  Widget _buildDataBackupTab(Color accentColor) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 9,
+          child: _Panel(
+            title: 'Daten & Backup',
+            subtitle: 'Profile / Statistiken',
+            accentColor: accentColor,
+            child: ListView(
+              children: [
+                _DataActionCard(
+                  title: 'Backup jetzt erstellen',
+                  subtitle:
+                      'Erstellt sofort eine Sicherheitskopie deiner Profile, Statistiken und Matchdaten.',
+                  icon: Icons.save_alt_rounded,
+                  accentColor: accentColor,
+                  isLoading: isCreatingDataBackup,
+                  onTap: _isDataBackupBusy ? null : _createDataBackupNow,
+                ),
+                const SizedBox(height: 14),
+                _DataActionCard(
+                  title: 'Backup-Ordner öffnen',
+                  subtitle:
+                      'Öffnet den Ordner, in dem automatische und manuelle Backups liegen.',
+                  icon: Icons.folder_open_rounded,
+                  accentColor: accentColor,
+                  isLoading: isOpeningBackupFolder,
+                  onTap: _isDataBackupBusy ? null : _openBackupFolder,
+                ),
+                const SizedBox(height: 14),
+                _DataActionCard(
+                  title: 'Datenbank exportieren',
+                  subtitle:
+                      'Kopiert die aktuelle Datenbank an einen Ort deiner Wahl, z. B. USB-Stick oder Cloud-Ordner.',
+                  icon: Icons.ios_share_rounded,
+                  accentColor: accentColor,
+                  isLoading: isExportingDataBackup,
+                  onTap: _isDataBackupBusy ? null : _exportDatabaseBackup,
+                ),
+                const SizedBox(height: 14),
+                _DataActionCard(
+                  title: 'Backup wiederherstellen',
+                  subtitle:
+                      'Wählt eine .db-Datei aus und setzt sie als aktive Datenbank ein. Vorher wird automatisch ein Sicherheitsbackup erstellt.',
+                  icon: Icons.restore_rounded,
+                  accentColor: const Color(0xFFFFC857),
+                  isLoading: isRestoringDataBackup,
+                  onTap: _isDataBackupBusy ? null : _pickAndRestoreDatabaseBackup,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141A22),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFF2A3545)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        backupStatusText,
+                        style: TextStyle(
+                          color: accentColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _UpdateDataLine(
+                        label: 'Datenbank',
+                        value: databasePathText.isEmpty
+                            ? 'nicht geladen'
+                            : databasePathText,
+                      ),
+                      _UpdateDataLine(
+                        label: 'Backups',
+                        value: backupFolderPathText.isEmpty
+                            ? 'nicht geladen'
+                            : backupFolderPathText,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Wichtig: Beim Wiederherstellen wird die aktuelle Datenbank vorher automatisch als before_restore-Backup gesichert. Trotzdem gilt: Wenn dir ein Stand extrem wichtig ist, exportiere ihn zusätzlich außerhalb des AppData-Ordners.',
+                  style: TextStyle(
+                    color: Color(0xFF9DA8B7),
+                    fontSize: 13,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          flex: 11,
+          child: _Panel(
+            title: 'Vorhandene Backups',
+            subtitle: '${databaseBackups.length}',
+            accentColor: accentColor,
+            child: databaseBackups.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Noch keine Backups vorhanden.',
+                      style: TextStyle(
+                        color: Color(0xFF9DA8B7),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: databaseBackups.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final DatabaseBackupInfo backup = databaseBackups[index];
+
+                      return _DatabaseBackupCard(
+                        backup: backup,
+                        accentColor: accentColor,
+                        restoreEnabled: !_isDataBackupBusy,
+                        onRestore: () => _restoreDatabaseBackup(backup.path),
+                      );
+                    },
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
 }
 
+
+class _DataActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accentColor;
+  final bool isLoading;
+  final VoidCallback? onTap;
+
+  const _DataActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.accentColor,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF141A22),
+          foregroundColor: accentColor,
+          disabledBackgroundColor: const Color(0xFF101720),
+          disabledForegroundColor: const Color(0xFF566172),
+          elevation: 0,
+          padding: const EdgeInsets.all(18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFF2A3545)),
+          ),
+        ),
+        child: Row(
+          children: [
+            isLoading
+                ? SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      color: accentColor,
+                    ),
+                  )
+                : Icon(icon, size: 30),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF9DA8B7),
+                      fontSize: 13,
+                      height: 1.3,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DatabaseBackupCard extends StatelessWidget {
+  final DatabaseBackupInfo backup;
+  final Color accentColor;
+  final bool restoreEnabled;
+  final VoidCallback onRestore;
+
+  const _DatabaseBackupCard({
+    required this.backup,
+    required this.accentColor,
+    required this.restoreEnabled,
+    required this.onRestore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141A22),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF2A3545)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.storage_rounded,
+            color: accentColor,
+            size: 30,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  backup.fileName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${backup.displayDate} · ${backup.displaySize}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF9DA8B7),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  backup.path,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF6F7A89),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          _SmallButton(
+            icon: Icons.restore_rounded,
+            label: 'Restore',
+            color: const Color(0xFFFFC857),
+            onTap: restoreEnabled ? onRestore : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _UpdateDataLine extends StatelessWidget {
   final String label;
