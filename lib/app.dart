@@ -156,9 +156,12 @@ class _HomeWithTopButtonsState extends State<_HomeWithTopButtons> {
             ],
           ),
           content: Text(
-            result.manifest.notes.trim().isEmpty
-                ? 'Es gibt eine neue Version von Dart Scoring PC.'
-                : result.manifest.notes,
+            [
+              result.manifest.notes.trim().isEmpty
+                  ? 'Es gibt eine neue Version von Dart Scoring PC.'
+                  : result.manifest.notes.trim(),
+              'Vor der Installation wird automatisch ein Backup deiner Profile und Statistiken erstellt. Erst danach wird der Installer heruntergeladen und gestartet.',
+            ].join('\n\n'),
             style: const TextStyle(
               color: Color(0xFFCFD7E3),
               height: 1.35,
@@ -184,7 +187,7 @@ class _HomeWithTopButtonsState extends State<_HomeWithTopButtons> {
                 );
               },
               icon: const Icon(Icons.download_for_offline_rounded),
-              label: const Text('Update öffnen'),
+              label: const Text('Update vorbereiten'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: accentColor,
                 foregroundColor: const Color(0xFF06100B),

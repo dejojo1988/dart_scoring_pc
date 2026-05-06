@@ -1,13 +1,13 @@
 class AppVersion {
   AppVersion._();
 
-  static const String number = '1.0.1.9';
+  static const String number = '1.0.2.0';
   static const String channel = 'BETA';
 
-  static const String visibleLabel = 'VERSION 1.0.1.9 · BETA';
+  static const String visibleLabel = 'VERSION 1.0.2.0 · BETA';
   static const String homeFooterLabel =
-      'Dart Scoring PC · Version 1.0.1.9 · BETA';
+      'Dart Scoring PC · Version 1.0.2.0 · BETA';
 
-  static const String windowTitle = 'Dart Scoring PC 1.0.1.9 BETA';
-  static const String installerVersion = '1.0.1.9-beta';
+  static const String windowTitle = 'Dart Scoring PC 1.0.2.0 BETA';
+  static const String installerVersion = '1.0.2.0-beta';
 }

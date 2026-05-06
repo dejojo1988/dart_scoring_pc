@@ -69,42 +69,103 @@ class AppDatabase {
     return directory;
   }
 
+  Future<File> createManualBackup({required String reason}) async {
+    final Database db = await database;
+
+    await _checkpointDatabaseIfPossible(db);
+
+    return _createDatabaseBackup(
+      databasePath: db.path,
+      reason: reason,
+      shouldCleanup: true,
+    );
+  }
+
   Future<void> _createDatabaseBackupIfPossible(String databasePath) async {
     try {
-      final File databaseFile = File(databasePath);
-
-      if (!await databaseFile.exists()) {
-        return;
-      }
-
-      final Directory backupDirectory = Directory(
-        path.join(
-          path.dirname(databasePath),
-          _backupFolderName,
-        ),
+      await _createDatabaseBackup(
+        databasePath: databasePath,
+        reason: 'app_start',
+        shouldCleanup: true,
       );
-
-      await backupDirectory.create(recursive: true);
-
-      final DateTime now = DateTime.now();
-      final String timestamp =
-          '${now.year.toString().padLeft(4, '0')}-'
-          '${now.month.toString().padLeft(2, '0')}-'
-          '${now.day.toString().padLeft(2, '0')}_'
-          '${now.hour.toString().padLeft(2, '0')}-'
-          '${now.minute.toString().padLeft(2, '0')}-'
-          '${now.second.toString().padLeft(2, '0')}';
-
-      final String backupPath = path.join(
-        backupDirectory.path,
-        'dart_scoring_pc_$timestamp.db',
-      );
-
-      await databaseFile.copy(backupPath);
-      await _cleanupOldBackups(backupDirectory);
     } catch (_) {
       // Backup darf den App-Start niemals verhindern.
     }
+  }
+
+  Future<File> _createDatabaseBackup({
+    required String databasePath,
+    required String reason,
+    required bool shouldCleanup,
+  }) async {
+    final File databaseFile = File(databasePath);
+
+    if (!await databaseFile.exists()) {
+      throw FileSystemException(
+        'Datenbankdatei wurde nicht gefunden. Backup wurde abgebrochen.',
+        databasePath,
+      );
+    }
+
+    final Directory backupDirectory = Directory(
+      path.join(
+        path.dirname(databasePath),
+        _backupFolderName,
+      ),
+    );
+
+    await backupDirectory.create(recursive: true);
+
+    final String timestamp = _backupTimestamp();
+    final String safeReason = _safeBackupReason(reason);
+
+    final String backupPath = path.join(
+      backupDirectory.path,
+      'dart_scoring_pc_${safeReason}_$timestamp.db',
+    );
+
+    final File backupFile = await databaseFile.copy(backupPath);
+
+    if (shouldCleanup) {
+      await _cleanupOldBackups(backupDirectory);
+    }
+
+    return backupFile;
+  }
+
+  Future<void> _checkpointDatabaseIfPossible(Database database) async {
+    try {
+      await database.rawQuery('PRAGMA wal_checkpoint(FULL)');
+    } catch (_) {
+      // Falls SQLite ohne WAL läuft oder der Checkpoint nicht möglich ist,
+      // darf das Backup nicht daran scheitern.
+    }
+  }
+
+  String _backupTimestamp() {
+    final DateTime now = DateTime.now();
+
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}-'
+        '${now.minute.toString().padLeft(2, '0')}-'
+        '${now.second.toString().padLeft(2, '0')}';
+  }
+
+  String _safeBackupReason(String reason) {
+    final String normalizedReason = reason
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9_-]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_\$'), '');
+
+    if (normalizedReason.isEmpty) {
+      return 'manual';
+    }
+
+    return normalizedReason;
   }
 
   Future<void> _cleanupOldBackups(Directory backupDirectory) async {
@@ -119,7 +180,7 @@ class AppDatabase {
         return b.lastModifiedSync().compareTo(a.lastModifiedSync());
       });
 
-      const int maxBackups = 10;
+      const int maxBackups = 20;
 
       if (backups.length <= maxBackups) {
         return;
@@ -561,7 +622,10 @@ class AppDatabase {
         leg_number,
         turn_number,
         dart_index,
+        dart_label,
         dart_score,
+        remaining_before,
+        is_bust,
         is_checkout_dart,
         checkout_score
       FROM x01_darts
@@ -574,12 +638,25 @@ class AppDatabase {
     final Map<String, int> totalFirst9ScoreByPlayer = {};
     final Map<String, int> totalFirst9DartsByPlayer = {};
     final Map<String, int> highestFinishByPlayer = {};
+    final Map<String, int> dartsThrownByLeg = {};
+    final Map<String, int> bestLegDartsByPlayer = {};
+    final Map<String, int> checkoutAttemptsByPlayer = {};
+    final Map<String, int> checkoutSuccessesByPlayer = {};
+    final Map<String, int> doubleAttemptsByPlayer = {};
+    final Map<String, int> doubleHitsByPlayer = {};
+    final Map<String, int> bustsByPlayer = {};
+    final Set<String> countedBustTurns = {};
+    final Set<String> countedDirectFinishBustTurns = {};
 
     for (final row in rows) {
       final String playerId = row['player_id'] as String;
       final String matchId = row['match_id'] as String;
       final int legNumber = (row['leg_number'] as num).toInt();
+      final int turnNumber = (row['turn_number'] as num).toInt();
+      final String dartLabel = row['dart_label'] as String;
       final int dartScore = (row['dart_score'] as num).toInt();
+      final int remainingBefore = (row['remaining_before'] as num).toInt();
+      final int isBust = (row['is_bust'] as num).toInt();
       final int isCheckoutDart = (row['is_checkout_dart'] as num).toInt();
       final int checkoutScore = (row['checkout_score'] as num).toInt();
 
@@ -595,11 +672,60 @@ class AppDatabase {
             (totalFirst9ScoreByPlayer[playerId] ?? 0) + dartScore;
       }
 
+      final int dartsInLeg = (dartsThrownByLeg[legKey] ?? 0) + 1;
+      dartsThrownByLeg[legKey] = dartsInLeg;
+
+      final String bustTurnKey = '$playerId|$matchId|$legNumber|$turnNumber';
+
+      if (isBust == 1 && !countedBustTurns.contains(bustTurnKey)) {
+        countedBustTurns.add(bustTurnKey);
+        bustsByPlayer[playerId] = (bustsByPlayer[playerId] ?? 0) + 1;
+      }
+
+      final bool isDoubleHit = dartLabel.startsWith('D') || dartLabel == 'Bull';
+      final bool isDirectDoubleFinish = _isDirectDoubleFinish(remainingBefore);
+
+      if (isBust == 1 && isDirectDoubleFinish) {
+        if (!countedDirectFinishBustTurns.contains(bustTurnKey)) {
+          countedDirectFinishBustTurns.add(bustTurnKey);
+          checkoutAttemptsByPlayer[playerId] =
+              (checkoutAttemptsByPlayer[playerId] ?? 0) + 1;
+          doubleAttemptsByPlayer[playerId] =
+              (doubleAttemptsByPlayer[playerId] ?? 0) + 1;
+        }
+      } else {
+        final bool countsAsCheckoutAttempt =
+            isCheckoutDart == 1 || isDirectDoubleFinish;
+
+        if (countsAsCheckoutAttempt) {
+          checkoutAttemptsByPlayer[playerId] =
+              (checkoutAttemptsByPlayer[playerId] ?? 0) + 1;
+          doubleAttemptsByPlayer[playerId] =
+              (doubleAttemptsByPlayer[playerId] ?? 0) + 1;
+        } else if (isDoubleHit) {
+          doubleAttemptsByPlayer[playerId] =
+              (doubleAttemptsByPlayer[playerId] ?? 0) + 1;
+        }
+      }
+
+      if (isDoubleHit) {
+        doubleHitsByPlayer[playerId] = (doubleHitsByPlayer[playerId] ?? 0) + 1;
+      }
+
       if (isCheckoutDart == 1 && checkoutScore > 0) {
+        checkoutSuccessesByPlayer[playerId] =
+            (checkoutSuccessesByPlayer[playerId] ?? 0) + 1;
+
         final int currentHighestFinish = highestFinishByPlayer[playerId] ?? 0;
 
         if (checkoutScore > currentHighestFinish) {
           highestFinishByPlayer[playerId] = checkoutScore;
+        }
+
+        final int currentBestLeg = bestLegDartsByPlayer[playerId] ?? 0;
+
+        if (currentBestLeg == 0 || dartsInLeg < currentBestLeg) {
+          bestLegDartsByPlayer[playerId] = dartsInLeg;
         }
       }
     }
@@ -607,6 +733,12 @@ class AppDatabase {
     final Set<String> playerIds = {
       ...totalFirst9DartsByPlayer.keys,
       ...highestFinishByPlayer.keys,
+      ...bestLegDartsByPlayer.keys,
+      ...checkoutAttemptsByPlayer.keys,
+      ...checkoutSuccessesByPlayer.keys,
+      ...doubleAttemptsByPlayer.keys,
+      ...doubleHitsByPlayer.keys,
+      ...bustsByPlayer.keys,
     };
 
     for (final playerId in playerIds) {
@@ -615,15 +747,46 @@ class AppDatabase {
       final double first9Average =
           first9Darts == 0 ? 0 : (first9Score / first9Darts) * 3;
 
+      final int checkoutAttempts = checkoutAttemptsByPlayer[playerId] ?? 0;
+      final int checkoutSuccesses = checkoutSuccessesByPlayer[playerId] ?? 0;
+      final double checkoutPercentage = checkoutAttempts == 0
+          ? 0
+          : (checkoutSuccesses / checkoutAttempts) * 100;
+
+      final int doubleAttempts = doubleAttemptsByPlayer[playerId] ?? 0;
+      final int doubleHits = doubleHitsByPlayer[playerId] ?? 0;
+      final double doublePercentage =
+          doubleAttempts == 0 ? 0 : (doubleHits / doubleAttempts) * 100;
+
       result[playerId] = {
         'highest_finish': highestFinishByPlayer[playerId] ?? 0,
         'first_9_average': first9Average,
         'first_9_score': first9Score,
         'first_9_darts': first9Darts,
+        'best_leg_darts': bestLegDartsByPlayer[playerId] ?? 0,
+        'checkout_attempts': checkoutAttempts,
+        'checkout_successes': checkoutSuccesses,
+        'checkout_percentage': checkoutPercentage,
+        'double_attempts': doubleAttempts,
+        'double_hits': doubleHits,
+        'double_percentage': doublePercentage,
+        'bust_count': bustsByPlayer[playerId] ?? 0,
       };
     }
 
     return result;
+  }
+
+  bool _isDirectDoubleFinish(int remainingScore) {
+    if (remainingScore == 50) {
+      return true;
+    }
+
+    if (remainingScore < 2 || remainingScore > 40) {
+      return false;
+    }
+
+    return remainingScore.isEven;
   }
 
   Future<void> insertX01DartRecords({
@@ -824,6 +987,14 @@ class AppDatabase {
       'first_9_average': 0,
       'first_9_score': 0,
       'first_9_darts': 0,
+      'best_leg_darts': 0,
+      'checkout_attempts': 0,
+      'checkout_successes': 0,
+      'checkout_percentage': 0,
+      'double_attempts': 0,
+      'double_hits': 0,
+      'double_percentage': 0,
+      'bust_count': 0,
     };
   }
 

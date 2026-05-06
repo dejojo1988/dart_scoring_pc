@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../app_version.dart';
+import '../data/app_database.dart';
 import '../services/appearance_service.dart';
 import '../services/audio_service.dart';
 import '../services/update_service.dart';
@@ -178,7 +181,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
       setState(() {
         updateCheckResult = result;
         updateStatusText = result.hasUpdate
-            ? 'Update ${result.manifest.version} verfügbar.'
+            ? 'Update ${result.manifest.version} verfügbar. Vor der Installation wird automatisch ein Backup erstellt.'
             : 'Keine neue Version verfügbar.';
       });
     } catch (error) {
@@ -213,10 +216,23 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
     setState(() {
       isDownloadingUpdate = true;
       updateDownloadProgress = 0;
-      updateStatusText = 'Update wird heruntergeladen...';
+      updateStatusText = 'Erstelle Sicherheits-Backup vor dem Update...';
     });
 
     try {
+      final File backupFile = await AppDatabase.instance.createManualBackup(
+        reason: 'before_update_${result.manifest.version}',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        updateStatusText =
+            'Backup erstellt: ${_displayPath(backupFile.path)}\nUpdate wird heruntergeladen...';
+      });
+
       final UpdateDownloadResult downloadResult =
           await UpdateService.instance.downloadInstaller(
         manifest: result.manifest,
@@ -238,7 +254,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
       setState(() {
         updateDownloadProgress = 1;
         updateStatusText =
-            'Installer heruntergeladen. Die App wird jetzt geschlossen.';
+            'Backup erstellt: ${_displayPath(backupFile.path)}\nInstaller heruntergeladen. Die App wird jetzt geschlossen.';
       });
 
       await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -252,7 +268,8 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
       }
 
       setState(() {
-        updateStatusText = 'Update konnte nicht installiert werden: $error';
+        updateStatusText =
+            'Update abgebrochen. Backup oder Installation fehlgeschlagen: $error';
         isDownloadingUpdate = false;
       });
     }
@@ -799,7 +816,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Die App liest eine update.json. Der Installer kann online oder in einem Netzwerkordner liegen. Die laufende App startet den Installer und beendet sich danach.',
+                        'Die App liest eine update.json. Vor jeder Installation wird automatisch ein Backup deiner Profile und Statistiken erstellt. Erst danach wird der Installer heruntergeladen und gestartet.',
                         style: TextStyle(
                           color: Color(0xFF9DA8B7),
                           fontSize: 13,
@@ -995,8 +1012,8 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                     icon: const Icon(Icons.download_for_offline_rounded),
                     label: Text(
                       isDownloadingUpdate
-                          ? 'Update wird vorbereitet...'
-                          : 'Update herunterladen und installieren',
+                          ? 'Backup / Update läuft...'
+                          : 'Backup erstellen und Update installieren',
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accentColor,
@@ -1016,7 +1033,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Wichtig: Die App kann sich nicht selbst überschreiben. Deshalb wird der Installer gestartet und die App beendet sich danach automatisch.',
+                  'Wichtig: Die App kann sich nicht selbst überschreiben. Deshalb wird zuerst ein Backup erstellt, danach der Installer gestartet und die App beendet sich automatisch.',
                   style: TextStyle(
                     color: Color(0xFF9DA8B7),
                     fontSize: 13,

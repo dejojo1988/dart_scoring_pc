@@ -718,6 +718,14 @@ class _ProfilesPageState extends State<ProfilesPage> {
           'first_9_average': 0,
           'first_9_score': 0,
           'first_9_darts': 0,
+          'best_leg_darts': 0,
+          'checkout_attempts': 0,
+          'checkout_successes': 0,
+          'checkout_percentage': 0,
+          'double_attempts': 0,
+          'double_hits': 0,
+          'double_percentage': 0,
+          'bust_count': 0,
         };
   }
 
@@ -1001,15 +1009,11 @@ class _ProfilesPageState extends State<ProfilesPage> {
   Widget _buildPlayerStatsPreview(Player player) {
     final Map<String, int> stats = _statsForPlayer(player);
 
-    final int gamesPlayed = stats['games_played'] ?? 0;
     final int wins = stats['wins'] ?? 0;
-    final int losses = stats['losses'] ?? 0;
     final int legsWon = stats['legs_won'] ?? 0;
-    final int setsWon = stats['sets_won'] ?? 0;
 
     final Map<String, num> dartStats = _dartStatsForPlayer(player);
     final double average = (dartStats['average'] ?? 0).toDouble();
-    final int highestScore = (dartStats['highest_score'] ?? 0).toInt();
     final int score180Count = (dartStats['score_180_count'] ?? 0).toInt();
     final int score140PlusCount =
         (dartStats['score_140_plus_count'] ?? 0).toInt();
@@ -1018,10 +1022,17 @@ class _ProfilesPageState extends State<ProfilesPage> {
 
     final Map<String, num> advancedX01Stats =
         _advancedX01StatsForPlayer(player);
+    final int bestLegDarts =
+        (advancedX01Stats['best_leg_darts'] ?? 0).toInt();
+    final double checkoutPercentage =
+        (advancedX01Stats['checkout_percentage'] ?? 0).toDouble();
+    final double doublePercentage =
+        (advancedX01Stats['double_percentage'] ?? 0).toDouble();
     final int highestFinish =
         (advancedX01Stats['highest_finish'] ?? 0).toInt();
-    final double first9Average =
-        (advancedX01Stats['first_9_average'] ?? 0).toDouble();
+    final int bustCount = (advancedX01Stats['bust_count'] ?? 0).toInt();
+
+    final String bestLegValue = bestLegDarts <= 0 ? '-' : '$bestLegDarts Darts';
 
     return Column(
       children: [
@@ -1116,52 +1127,48 @@ class _ProfilesPageState extends State<ProfilesPage> {
             childAspectRatio: 2.6,
             children: [
               _StatPreviewCard(
-                label: 'Gespielte Spiele',
-                value: '$gamesPlayed',
-              ),
-              _StatPreviewCard(
-                label: 'Siege',
-                value: '$wins',
-              ),
-              _StatPreviewCard(
-                label: 'Niederlagen',
-                value: '$losses',
-              ),
-              _StatPreviewCard(
-                label: 'Legs gewonnen',
-                value: '$legsWon',
-              ),
-              _StatPreviewCard(
-                label: 'Sets gewonnen',
-                value: '$setsWon',
-              ),
-              _StatPreviewCard(
-                label: 'x01 Average',
+                label: 'Average',
                 value: average.toStringAsFixed(2),
               ),
               _StatPreviewCard(
-                label: 'x01 Highest Score',
-                value: '$highestScore',
+                label: 'Best Leg',
+                value: bestLegValue,
               ),
               _StatPreviewCard(
-                label: 'Highest Finish',
+                label: 'Checkout %',
+                value: '${checkoutPercentage.toStringAsFixed(1)}%',
+              ),
+              _StatPreviewCard(
+                label: 'Doppel %',
+                value: '${doublePercentage.toStringAsFixed(1)}%',
+              ),
+              _StatPreviewCard(
+                label: 'High Checkout',
                 value: '$highestFinish',
               ),
               _StatPreviewCard(
-                label: 'x01 180er',
+                label: 'Busts',
+                value: '$bustCount',
+              ),
+              _StatPreviewCard(
+                label: 'Matches won',
+                value: '$wins',
+              ),
+              _StatPreviewCard(
+                label: 'Legs won',
+                value: '$legsWon',
+              ),
+              _StatPreviewCard(
+                label: '180s',
                 value: '$score180Count',
               ),
               _StatPreviewCard(
-                label: 'x01 140+',
-                value: '$score140PlusCount',
-              ),
-              _StatPreviewCard(
-                label: 'x01 100+',
+                label: '100+',
                 value: '$score100PlusCount',
               ),
               _StatPreviewCard(
-                label: 'First-9-Average',
-                value: first9Average.toStringAsFixed(2),
+                label: '140+',
+                value: '$score140PlusCount',
               ),
             ],
           ),
