@@ -1,6 +1,6 @@
 {
-  "version": "1.0.2.1",
+  "version": "1.0.2.2",
   "channel": "beta",
-  "installerUrl": "https://github.com/dejojo1988/dart_scoring_pc/releases/download/v1.0.2.1-beta/DartScoringPC-Setup-1.0.2.1-beta.exe",
-  "notes": "Version 1.0.2.1 BETA: You-require-Ansage eingebaut. Ab Rest 160 oder weniger wird vor dem Wurf player-X, you-require und die Restzahl angesagt. Die Wurfeingabe wird erst nach der Ansage freigegeben. Gilt für Spieler und Bot."
+  "installerUrl": "https://github.com/dejojo1988/dart_scoring_pc/releases/download/v1.0.2.2-beta/DartScoringPC-Setup-1.0.2.2-beta.exe",
+  "notes": "Version 1.0.2.2 BETA: Neuer Daten- und Backup-Bereich in den Einstellungen. Manuelles Backup erstellen, Backup-Ordner öffnen, Datenbank exportieren und Backup wiederherstellen. Restore erfolgreich getestet."
 }
