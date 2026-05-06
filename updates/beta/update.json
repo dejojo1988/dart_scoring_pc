@@ -1,6 +1,6 @@
 {
-  "version": "1.0.1.9",
+  "version": "1.0.2.0",
   "channel": "beta",
-  "installerUrl": "https://github.com/dejojo1988/dart_scoring_pc/releases/download/v1.0.1.9-beta/DartScoringPC-Setup-1.0.1.9-beta.exe",
-  "notes": "Version 1.0.1.9 BETA: Cleanup-Update. Flutter Analyzer bereinigt, veraltete withOpacity-Nutzung ersetzt, Versionierung korrigiert und Wurfeingabe optisch bereinigt."
+  "installerUrl": "https://github.com/dejojo1988/dart_scoring_pc/releases/download/v1.0.2.0-beta/DartScoringPC-Setup-1.0.2.0-beta.exe",
+  "notes": "Version 1.0.2.0 BETA: Statistikbereich neu sortiert und erweitert. Sicherheits-Backup vor Update-Download eingebaut. Die Update-Installation wird blockiert, wenn das Backup fehlschlägt."
 }
