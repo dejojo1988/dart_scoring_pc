@@ -1,6 +1,6 @@
 {
-  "version": "1.0.3.0",
+  "version": "1.0.3.1",
   "channel": "beta",
-  "installerUrl": "https://github.com/dejojo1988/dart_scoring_pc/releases/download/v1.0.3.0-beta/DartScoringPC-Setup-1.0.3.0-beta.exe",
-  "notes": "Version 1.0.3.0 BETA: Match-UI überarbeitet, aktive Spielerkarte größer, inaktive Spieler kompakter, Live Match Average, Live Leg Average, letzter Wurf, responsive Wurfeingabe für 1920x1080, Layout-Overflows behoben und Classic-Counter mit classic.mp3 eingebaut."
+  "installerUrl": "https://github.com/dejojo1988/dart_scoring_pc/releases/download/v1.0.3.1-beta/DartScoringPC-Setup-1.0.3.1-beta.exe",
+  "notes": "Version 1.0.3.1 BETA: Audio-System vollständig auf WAV umgestellt, Standard-Sounds vereinheitlicht, alte MP3-Standarddateien entfernt und Einstellungsseite sauber von audio_settings_page.dart zu app_settings_page.dart umbenannt."
 }
