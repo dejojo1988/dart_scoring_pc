@@ -3,11 +3,11 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../app_version.dart';
-import '../data/app_database.dart';
-import '../services/appearance_service.dart';
-import '../services/audio_service.dart';
-import '../services/update_service.dart';
+import '../../app_version.dart';
+import '../../data/app_database.dart';
+import '../../services/appearance_service.dart';
+import '../../services/audio_service.dart';
+import '../../services/update_service.dart';
 
 class AppSettingsPage extends StatefulWidget {
   const AppSettingsPage({super.key});

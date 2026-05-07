@@ -3,7 +3,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app_version.dart';
 import 'data/app_database.dart';
-import 'pages/app_settings_page.dart';
+import 'pages/settings/app_settings_page.dart';
 import 'pages/home_page.dart';
 import 'services/appearance_service.dart';
 import 'services/update_service.dart';
