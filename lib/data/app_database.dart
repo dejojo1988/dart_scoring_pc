@@ -28,7 +28,6 @@ class AppDatabase {
     return newDatabase;
   }
 
-
   Future<Directory> getApplicationDataDirectory() async {
     return _getDatabaseDirectory();
   }
@@ -293,7 +292,6 @@ class AppDatabase {
 
     return normalizedReason;
   }
-
 
   Future<void> _deleteSQLiteSidecarFiles(String databasePath) async {
     final List<String> sidecarPaths = [
@@ -696,11 +694,20 @@ class AppDatabase {
 
     final double average = totalDarts == 0 ? 0 : (totalScore / totalDarts) * 3;
 
+    final Map<String, num> formStats = await _getPlayerFormDartStats(
+      playerId: playerId,
+      gameType: 'x01',
+      targetDarts: 100,
+    );
+
     return {
       'turn_count': (row['turn_count'] as num).toInt(),
       'total_score': totalScore,
       'total_darts': totalDarts,
       'average': average,
+      'form_average': formStats['form_average'] ?? 0,
+      'form_score': formStats['form_score'] ?? 0,
+      'form_darts': formStats['form_darts'] ?? 0,
       'highest_score': (row['highest_score'] as num).toInt(),
       'score_180_count': (row['score_180_count'] as num).toInt(),
       'score_140_plus_count': (row['score_140_plus_count'] as num).toInt(),
@@ -731,6 +738,12 @@ class AppDatabase {
       ],
     );
 
+    final Map<String, Map<String, num>> formStatsByPlayerId =
+        await _getAllPlayerFormDartStats(
+      gameType: 'x01',
+      targetDarts: 100,
+    );
+
     final Map<String, Map<String, num>> result = {};
 
     for (final row in rows) {
@@ -738,16 +751,122 @@ class AppDatabase {
       final int totalScore = (row['total_score'] as num).toInt();
       final int totalDarts = (row['total_darts'] as num).toInt();
       final double average = totalDarts == 0 ? 0 : (totalScore / totalDarts) * 3;
+      final Map<String, num> formStats =
+          formStatsByPlayerId[playerId] ?? _emptyFormDartStats();
 
       result[playerId] = {
         'turn_count': (row['turn_count'] as num).toInt(),
         'total_score': totalScore,
         'total_darts': totalDarts,
         'average': average,
+        'form_average': formStats['form_average'] ?? 0,
+        'form_score': formStats['form_score'] ?? 0,
+        'form_darts': formStats['form_darts'] ?? 0,
         'highest_score': (row['highest_score'] as num).toInt(),
         'score_180_count': (row['score_180_count'] as num).toInt(),
         'score_140_plus_count': (row['score_140_plus_count'] as num).toInt(),
         'score_100_plus_count': (row['score_100_plus_count'] as num).toInt(),
+      };
+    }
+
+    return result;
+  }
+
+  Future<Map<String, num>> _getPlayerFormDartStats({
+    required String playerId,
+    required String gameType,
+    required int targetDarts,
+  }) async {
+    final Database db = await database;
+
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      '''
+      SELECT
+        turn_score,
+        dart_count
+      FROM match_darts
+      WHERE player_id = ?
+      AND game_type = ?
+      ORDER BY created_at DESC, id DESC
+      ''',
+      [
+        playerId,
+        gameType,
+      ],
+    );
+
+    int formScore = 0;
+    int formDarts = 0;
+
+    for (final row in rows) {
+      if (formDarts >= targetDarts) {
+        break;
+      }
+
+      formScore += (row['turn_score'] as num).toInt();
+      formDarts += (row['dart_count'] as num).toInt();
+    }
+
+    final double formAverage =
+        formDarts == 0 ? 0 : (formScore / formDarts) * 3;
+
+    return {
+      'form_average': formAverage,
+      'form_score': formScore,
+      'form_darts': formDarts,
+    };
+  }
+
+  Future<Map<String, Map<String, num>>> _getAllPlayerFormDartStats({
+    required String gameType,
+    required int targetDarts,
+  }) async {
+    final Database db = await database;
+
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      '''
+      SELECT
+        player_id,
+        turn_score,
+        dart_count
+      FROM match_darts
+      WHERE game_type = ?
+      ORDER BY player_id ASC, created_at DESC, id DESC
+      ''',
+      [
+        gameType,
+      ],
+    );
+
+    final Map<String, int> scoreByPlayerId = {};
+    final Map<String, int> dartsByPlayerId = {};
+
+    for (final row in rows) {
+      final String playerId = row['player_id'] as String;
+      final int currentDarts = dartsByPlayerId[playerId] ?? 0;
+
+      if (currentDarts >= targetDarts) {
+        continue;
+      }
+
+      scoreByPlayerId[playerId] =
+          (scoreByPlayerId[playerId] ?? 0) + (row['turn_score'] as num).toInt();
+      dartsByPlayerId[playerId] =
+          currentDarts + (row['dart_count'] as num).toInt();
+    }
+
+    final Map<String, Map<String, num>> result = {};
+
+    for (final playerId in dartsByPlayerId.keys) {
+      final int formScore = scoreByPlayerId[playerId] ?? 0;
+      final int formDarts = dartsByPlayerId[playerId] ?? 0;
+      final double formAverage =
+          formDarts == 0 ? 0 : (formScore / formDarts) * 3;
+
+      result[playerId] = {
+        'form_average': formAverage,
+        'form_score': formScore,
+        'form_darts': formDarts,
       };
     }
 
@@ -783,13 +902,19 @@ class AppDatabase {
       ''',
     );
 
+    final Map<String, int> bestRtcLegDartsByPlayer =
+        await _getBestRtcLegDartsByPlayer(db);
+
     final Map<String, Map<String, num>> result = {};
     final Map<String, int> first9DartsByLeg = {};
     final Map<String, int> totalFirst9ScoreByPlayer = {};
     final Map<String, int> totalFirst9DartsByPlayer = {};
     final Map<String, int> highestFinishByPlayer = {};
     final Map<String, int> dartsThrownByLeg = {};
+    final Map<String, int> legStartScoreByLeg = {};
     final Map<String, int> bestLegDartsByPlayer = {};
+    final Map<String, int> bestLeg301DartsByPlayer = {};
+    final Map<String, int> bestLeg501DartsByPlayer = {};
     final Map<String, int> checkoutAttemptsByPlayer = {};
     final Map<String, int> checkoutSuccessesByPlayer = {};
     final Map<String, int> doubleAttemptsByPlayer = {};
@@ -827,6 +952,12 @@ class AppDatabase {
 
       final int dartsInLeg = (dartsThrownByLeg[legKey] ?? 0) + 1;
       dartsThrownByLeg[legKey] = dartsInLeg;
+
+      final int currentLegStartScore = legStartScoreByLeg[legKey] ?? 0;
+
+      if (remainingBefore > currentLegStartScore) {
+        legStartScoreByLeg[legKey] = remainingBefore;
+      }
 
       final String bustTurnKey = '$playerId|$matchId|$legNumber|$turnNumber';
 
@@ -887,6 +1018,24 @@ class AppDatabase {
         if (currentBestLeg == 0 || dartsInLeg < currentBestLeg) {
           bestLegDartsByPlayer[playerId] = dartsInLeg;
         }
+
+        final int legStartScore = legStartScoreByLeg[legKey] ?? 0;
+
+        if (legStartScore == 301) {
+          final int currentBest301 = bestLeg301DartsByPlayer[playerId] ?? 0;
+
+          if (currentBest301 == 0 || dartsInLeg < currentBest301) {
+            bestLeg301DartsByPlayer[playerId] = dartsInLeg;
+          }
+        }
+
+        if (legStartScore == 501) {
+          final int currentBest501 = bestLeg501DartsByPlayer[playerId] ?? 0;
+
+          if (currentBest501 == 0 || dartsInLeg < currentBest501) {
+            bestLeg501DartsByPlayer[playerId] = dartsInLeg;
+          }
+        }
       }
     }
 
@@ -921,6 +1070,9 @@ class AppDatabase {
       ...totalFirst9DartsByPlayer.keys,
       ...highestFinishByPlayer.keys,
       ...bestLegDartsByPlayer.keys,
+      ...bestLeg301DartsByPlayer.keys,
+      ...bestLeg501DartsByPlayer.keys,
+      ...bestRtcLegDartsByPlayer.keys,
       ...checkoutAttemptsByPlayer.keys,
       ...checkoutSuccessesByPlayer.keys,
       ...doubleAttemptsByPlayer.keys,
@@ -952,6 +1104,9 @@ class AppDatabase {
         'first_9_score': first9Score,
         'first_9_darts': first9Darts,
         'best_leg_darts': bestLegDartsByPlayer[playerId] ?? 0,
+        'best_leg_301_darts': bestLeg301DartsByPlayer[playerId] ?? 0,
+        'best_leg_501_darts': bestLeg501DartsByPlayer[playerId] ?? 0,
+        'best_leg_rtc_darts': bestRtcLegDartsByPlayer[playerId] ?? 0,
         'checkout_attempts': checkoutAttempts,
         'checkout_successes': checkoutSuccesses,
         'checkout_percentage': checkoutPercentage,
@@ -961,6 +1116,32 @@ class AppDatabase {
         'bust_count': bustsByPlayer[playerId] ?? 0,
         'classic_count': classicCountByPlayer[playerId] ?? 0,
       };
+    }
+
+    return result;
+  }
+
+  Future<Map<String, int>> _getBestRtcLegDartsByPlayer(Database db) async {
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      '''
+      SELECT
+        player_id,
+        MIN(dart_count) AS best_leg_rtc_darts
+      FROM match_darts
+      WHERE game_type = ?
+      AND dart_count > 0
+      GROUP BY player_id
+      ''',
+      [
+        'rtc',
+      ],
+    );
+
+    final Map<String, int> result = {};
+
+    for (final row in rows) {
+      final String playerId = row['player_id'] as String;
+      result[playerId] = (row['best_leg_rtc_darts'] as num).toInt();
     }
 
     return result;
@@ -1177,6 +1358,9 @@ class AppDatabase {
       'first_9_score': 0,
       'first_9_darts': 0,
       'best_leg_darts': 0,
+      'best_leg_301_darts': 0,
+      'best_leg_501_darts': 0,
+      'best_leg_rtc_darts': 0,
       'checkout_attempts': 0,
       'checkout_successes': 0,
       'checkout_percentage': 0,
@@ -1194,10 +1378,21 @@ class AppDatabase {
       'total_score': 0,
       'total_darts': 0,
       'average': 0,
+      'form_average': 0,
+      'form_score': 0,
+      'form_darts': 0,
       'highest_score': 0,
       'score_180_count': 0,
       'score_140_plus_count': 0,
       'score_100_plus_count': 0,
+    };
+  }
+
+  Map<String, num> _emptyFormDartStats() {
+    return {
+      'form_average': 0,
+      'form_score': 0,
+      'form_darts': 0,
     };
   }
 }

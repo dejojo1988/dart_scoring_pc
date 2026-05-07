@@ -109,10 +109,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
                       width: 54,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha:0.13),
+                        color: accentColor.withValues(alpha: 0.13),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: accentColor.withValues(alpha:0.25),
+                          color: accentColor.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Icon(
@@ -243,10 +243,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
                       width: 54,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha:0.13),
+                        color: accentColor.withValues(alpha: 0.13),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: accentColor.withValues(alpha:0.25),
+                          color: accentColor.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Icon(
@@ -375,10 +375,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
                       width: 54,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF5C77).withValues(alpha:0.13),
+                        color: const Color(0xFFFF5C77).withValues(alpha: 0.13),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: const Color(0xFFFF5C77).withValues(alpha:0.35),
+                          color: const Color(0xFFFF5C77).withValues(alpha: 0.35),
                         ),
                       ),
                       child: const Icon(
@@ -552,113 +552,113 @@ class _ProfilesPageState extends State<ProfilesPage> {
   }
 
   Future<void> _createProfileFromDialog({
-  required BuildContext dialogContext,
-  required String name,
-}) async {
-  final String cleanedName = name.trim();
+    required BuildContext dialogContext,
+    required String name,
+  }) async {
+    final String cleanedName = name.trim();
 
-  if (cleanedName.isEmpty) {
-    _showMessage('Bitte gib einen Spielernamen ein.');
-    return;
-  }
-
-  final bool nameAlreadyExists =
-      await AppDatabase.instance.playerNameExists(cleanedName);
-
-  if (!mounted) {
-    return;
-  }
-
-  if (nameAlreadyExists) {
-    _showMessage('Ein Spieler mit diesem Namen existiert bereits.');
-    return;
-  }
-
-  final Player newPlayer = Player(
-    id: 'profile_${DateTime.now().millisecondsSinceEpoch}',
-    name: cleanedName,
-  );
-
-  await AppDatabase.instance.insertPlayer(newPlayer);
-
-  if (!mounted) {
-    return;
-  }
-
-  setState(() {
-    selectedPlayer = newPlayer;
-  });
-
-  await _loadPlayersAndStats();
-
-  if (!mounted || !dialogContext.mounted) {
-    return;
-  }
-
-  Navigator.of(dialogContext).pop();
-  _showMessage('Profil "$cleanedName" wurde gespeichert.');
-}
-
-  Future<void> _updateProfileFromDialog({
-  required BuildContext dialogContext,
-  required Player player,
-  required String newName,
-}) async {
-  final String cleanedName = newName.trim();
-
-  if (cleanedName.isEmpty) {
-    _showMessage('Bitte gib einen Spielernamen ein.');
-    return;
-  }
-
-  if (cleanedName == player.name) {
-    if (dialogContext.mounted) {
-      Navigator.of(dialogContext).pop();
+    if (cleanedName.isEmpty) {
+      _showMessage('Bitte gib einen Spielernamen ein.');
+      return;
     }
 
-    return;
-  }
+    final bool nameAlreadyExists =
+        await AppDatabase.instance.playerNameExists(cleanedName);
 
-  final bool nameAlreadyExists =
-      await AppDatabase.instance.playerNameExistsForOtherPlayer(
-    name: cleanedName,
-    currentPlayerId: player.id,
-  );
+    if (!mounted) {
+      return;
+    }
 
-  if (!mounted) {
-    return;
-  }
+    if (nameAlreadyExists) {
+      _showMessage('Ein Spieler mit diesem Namen existiert bereits.');
+      return;
+    }
 
-  if (nameAlreadyExists) {
-    _showMessage('Ein anderer Spieler nutzt diesen Namen bereits.');
-    return;
-  }
-
-  await AppDatabase.instance.updatePlayerName(
-    playerId: player.id,
-    newName: cleanedName,
-  );
-
-  if (!mounted) {
-    return;
-  }
-
-  setState(() {
-    selectedPlayer = Player(
-      id: player.id,
+    final Player newPlayer = Player(
+      id: 'profile_${DateTime.now().millisecondsSinceEpoch}',
       name: cleanedName,
     );
-  });
 
-  await _loadPlayersAndStats();
+    await AppDatabase.instance.insertPlayer(newPlayer);
 
-  if (!mounted || !dialogContext.mounted) {
-    return;
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      selectedPlayer = newPlayer;
+    });
+
+    await _loadPlayersAndStats();
+
+    if (!mounted || !dialogContext.mounted) {
+      return;
+    }
+
+    Navigator.of(dialogContext).pop();
+    _showMessage('Profil "$cleanedName" wurde gespeichert.');
   }
 
-  Navigator.of(dialogContext).pop();
-  _showMessage('Profil wurde umbenannt in "$cleanedName".');
-}
+  Future<void> _updateProfileFromDialog({
+    required BuildContext dialogContext,
+    required Player player,
+    required String newName,
+  }) async {
+    final String cleanedName = newName.trim();
+
+    if (cleanedName.isEmpty) {
+      _showMessage('Bitte gib einen Spielernamen ein.');
+      return;
+    }
+
+    if (cleanedName == player.name) {
+      if (dialogContext.mounted) {
+        Navigator.of(dialogContext).pop();
+      }
+
+      return;
+    }
+
+    final bool nameAlreadyExists =
+        await AppDatabase.instance.playerNameExistsForOtherPlayer(
+      name: cleanedName,
+      currentPlayerId: player.id,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (nameAlreadyExists) {
+      _showMessage('Ein anderer Spieler nutzt diesen Namen bereits.');
+      return;
+    }
+
+    await AppDatabase.instance.updatePlayerName(
+      playerId: player.id,
+      newName: cleanedName,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      selectedPlayer = Player(
+        id: player.id,
+        name: cleanedName,
+      );
+    });
+
+    await _loadPlayersAndStats();
+
+    if (!mounted || !dialogContext.mounted) {
+      return;
+    }
+
+    Navigator.of(dialogContext).pop();
+    _showMessage('Profil wurde umbenannt in "$cleanedName".');
+  }
 
   void _selectPlayer(Player player) {
     setState(() {
@@ -704,6 +704,9 @@ class _ProfilesPageState extends State<ProfilesPage> {
           'total_score': 0,
           'total_darts': 0,
           'average': 0,
+          'form_average': 0,
+          'form_score': 0,
+          'form_darts': 0,
           'highest_score': 0,
           'score_180_count': 0,
           'score_140_plus_count': 0,
@@ -719,6 +722,9 @@ class _ProfilesPageState extends State<ProfilesPage> {
           'first_9_score': 0,
           'first_9_darts': 0,
           'best_leg_darts': 0,
+          'best_leg_301_darts': 0,
+          'best_leg_501_darts': 0,
+          'best_leg_rtc_darts': 0,
           'checkout_attempts': 0,
           'checkout_successes': 0,
           'checkout_percentage': 0,
@@ -726,6 +732,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
           'double_hits': 0,
           'double_percentage': 0,
           'bust_count': 0,
+          'classic_count': 0,
         };
   }
 
@@ -756,7 +763,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              accentColor.withValues(alpha:0.20),
+              accentColor.withValues(alpha: 0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -819,10 +826,10 @@ class _ProfilesPageState extends State<ProfilesPage> {
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withValues(alpha:0.13),
+            color: accentColor.withValues(alpha: 0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withValues(alpha:0.25),
+              color: accentColor.withValues(alpha: 0.25),
             ),
           ),
           child: Icon(
@@ -957,7 +964,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
   Widget _buildStatsPanel(Player? player) {
     return _Panel(
       title: player == null ? 'Statistiken' : player.name,
-      subtitle: player == null ? 'Kein Spieler ausgewählt' : 'Echte Basiswerte',
+      subtitle: player == null ? 'Kein Spieler ausgewählt' : 'Live-Profilwerte',
       child: player == null
           ? _buildNoPlayerSelected()
           : _buildPlayerStatsPreview(player),
@@ -1014,6 +1021,8 @@ class _ProfilesPageState extends State<ProfilesPage> {
 
     final Map<String, num> dartStats = _dartStatsForPlayer(player);
     final double average = (dartStats['average'] ?? 0).toDouble();
+    final double formAverage = (dartStats['form_average'] ?? 0).toDouble();
+    final int formDarts = (dartStats['form_darts'] ?? 0).toInt();
     final int score180Count = (dartStats['score_180_count'] ?? 0).toInt();
     final int score140PlusCount =
         (dartStats['score_140_plus_count'] ?? 0).toInt();
@@ -1022,8 +1031,12 @@ class _ProfilesPageState extends State<ProfilesPage> {
 
     final Map<String, num> advancedX01Stats =
         _advancedX01StatsForPlayer(player);
-    final int bestLegDarts =
-        (advancedX01Stats['best_leg_darts'] ?? 0).toInt();
+    final int bestLeg301Darts =
+        (advancedX01Stats['best_leg_301_darts'] ?? 0).toInt();
+    final int bestLeg501Darts =
+        (advancedX01Stats['best_leg_501_darts'] ?? 0).toInt();
+    final int bestLegRtcDarts =
+        (advancedX01Stats['best_leg_rtc_darts'] ?? 0).toInt();
     final double checkoutPercentage =
         (advancedX01Stats['checkout_percentage'] ?? 0).toDouble();
     final double doublePercentage =
@@ -1032,8 +1045,6 @@ class _ProfilesPageState extends State<ProfilesPage> {
         (advancedX01Stats['highest_finish'] ?? 0).toInt();
     final int bustCount = (advancedX01Stats['bust_count'] ?? 0).toInt();
     final int classicCount = (advancedX01Stats['classic_count'] ?? 0).toInt();
-
-    final String bestLegValue = bestLegDarts <= 0 ? '-' : '$bestLegDarts Darts';
 
     return Column(
       children: [
@@ -1056,7 +1067,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
                   color: Theme.of(context)
                       .colorScheme
                       .primary
-                      .withValues(alpha:0.13),
+                      .withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(
@@ -1080,9 +1091,12 @@ class _ProfilesPageState extends State<ProfilesPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Profilstatistiken',
-                      style: TextStyle(
+                    Text(
+                      formDarts > 0
+                          ? 'Profilstatistiken · Form aus letzten $formDarts Darts'
+                          : 'Profilstatistiken',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
                         color: Color(0xFF9DA8B7),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1128,12 +1142,24 @@ class _ProfilesPageState extends State<ProfilesPage> {
             childAspectRatio: 2.6,
             children: [
               _StatPreviewCard(
-                label: 'Average',
-                value: average.toStringAsFixed(2),
+                label: 'Gesamt Ø',
+                value: _averageValue(average),
               ),
               _StatPreviewCard(
-                label: 'Best Leg',
-                value: bestLegValue,
+                label: 'Form Ø',
+                value: _averageValue(formAverage),
+              ),
+              _StatPreviewCard(
+                label: 'Best Leg 301',
+                value: _bestLegValue(bestLeg301Darts),
+              ),
+              _StatPreviewCard(
+                label: 'Best Leg 501',
+                value: _bestLegValue(bestLeg501Darts),
+              ),
+              _StatPreviewCard(
+                label: 'Best Leg RTC',
+                value: _bestLegValue(bestLegRtcDarts),
               ),
               _StatPreviewCard(
                 label: 'Checkout %',
@@ -1145,7 +1171,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
               ),
               _StatPreviewCard(
                 label: 'High Checkout',
-                value: '$highestFinish',
+                value: highestFinish <= 0 ? '-' : '$highestFinish',
               ),
               _StatPreviewCard(
                 label: 'Busts',
@@ -1385,7 +1411,7 @@ class _BigActionButton extends StatelessWidget {
               width: 54,
               height: 54,
               decoration: BoxDecoration(
-                color: accentColor.withValues(alpha:0.13),
+                color: accentColor.withValues(alpha: 0.13),
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Icon(
@@ -1455,7 +1481,9 @@ class _PlayerProfileCard extends StatelessWidget {
     final Color accentColor = Theme.of(context).colorScheme.primary;
 
     return Material(
-      color: isSelected ? accentColor.withValues(alpha:0.12) : const Color(0xFF141A22),
+      color: isSelected
+          ? accentColor.withValues(alpha: 0.12)
+          : const Color(0xFF141A22),
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: onTap,
@@ -1537,7 +1565,7 @@ class _StatPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isPlaceholder = value == 'später';
+    final bool isPlaceholder = value == '-' || value == 'später';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -1568,7 +1596,7 @@ class _StatPreviewCard extends StatelessWidget {
               color: isPlaceholder
                   ? const Color(0xFF6F7A89)
                   : Theme.of(context).colorScheme.primary,
-              fontSize: isPlaceholder ? 16 : 24,
+              fontSize: isPlaceholder ? 20 : 24,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -1576,4 +1604,20 @@ class _StatPreviewCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _averageValue(double value) {
+  if (value <= 0 || value.isNaN || value.isInfinite) {
+    return '-';
+  }
+
+  return value.toStringAsFixed(2);
+}
+
+String _bestLegValue(int darts) {
+  if (darts <= 0) {
+    return '-';
+  }
+
+  return '$darts Darts';
 }
