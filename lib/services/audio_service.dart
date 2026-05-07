@@ -83,7 +83,7 @@ extension AudioEventTypeMeta on AudioEventType {
       case AudioEventType.dartMiss:
         return 'Kurzer Miss-Sound, wenn ein Spieler oder Bot MISS wirft.';
       case AudioEventType.gameStart:
-        return 'Standard: assets/audio/default_pack/gameon.mp3. Optional überschreibbar.';
+        return 'Standard: assets/audio/default_pack/gameon.wav. Optional überschreibbar.';
       case AudioEventType.playerTurn:
         return 'Sound bevor der Ansager den nächsten Spieler nennt.';
       case AudioEventType.turnScore:
@@ -91,11 +91,11 @@ extension AudioEventTypeMeta on AudioEventType {
       case AudioEventType.bust:
         return 'Jingle bei Überwurf.';
       case AudioEventType.legWin:
-        return 'Standard: assets/audio/default_pack/gewonnen.mp3. Optional überschreibbar.';
+        return 'Standard: assets/audio/default_pack/gewonnen.wav. Optional überschreibbar.';
       case AudioEventType.setWin:
-        return 'Standard: assets/audio/default_pack/gewonnen.mp3. Optional überschreibbar.';
+        return 'Standard: assets/audio/default_pack/gewonnen.wav. Optional überschreibbar.';
       case AudioEventType.matchWin:
-        return 'Standard: assets/audio/default_pack/gewonnen.mp3. Optional überschreibbar.';
+        return 'Standard: assets/audio/default_pack/win.wav. Optional überschreibbar.';
       case AudioEventType.undo:
         return 'Kurzer Sound beim Zurücknehmen.';
     }
@@ -224,7 +224,12 @@ class AudioService {
       _settings = AudioSettings.defaults();
     }
 
+    _settings = _settings.copyWith(
+      filePathsByEventKey: _wavOnlyPaths(_settings.filePathsByEventKey),
+    );
+
     _loaded = true;
+    await save();
   }
 
   Future<void> save() async {
@@ -241,7 +246,9 @@ class AudioService {
   }
 
   Future<void> updateSettings(AudioSettings settings) async {
-    _settings = settings;
+    _settings = settings.copyWith(
+      filePathsByEventKey: _wavOnlyPaths(settings.filePathsByEventKey),
+    );
     await save();
   }
 
@@ -251,10 +258,16 @@ class AudioService {
   }) async {
     await load();
 
+    final String cleanFilePath = filePath.trim();
+
+    if (!_isWavPath(cleanFilePath)) {
+      return;
+    }
+
     final Map<String, String> nextPaths =
         Map<String, String>.from(_settings.filePathsByEventKey);
 
-    nextPaths[eventType.key] = filePath;
+    nextPaths[eventType.key] = cleanFilePath;
 
     await updateSettings(
       _settings.copyWith(filePathsByEventKey: nextPaths),
@@ -278,6 +291,10 @@ class AudioService {
     final String? path = _settings.filePathsByEventKey[eventType.key];
 
     if (path == null || path.trim().isEmpty) {
+      return null;
+    }
+
+    if (!_isWavPath(path)) {
       return null;
     }
 
@@ -377,7 +394,6 @@ class AudioService {
     }
   }
 
-
   Future<void> announceCheckoutRequirement({
     required String playerName,
     required int remainingScore,
@@ -401,7 +417,8 @@ class AudioService {
     }
 
     final bool playedRequireAsset = await _playDefaultYouRequireAsset();
-    final bool playedNumberAsset = await _playDefaultNumberAsset(safeRemainingScore);
+    final bool playedNumberAsset =
+        await _playDefaultNumberAsset(safeRemainingScore);
 
     if (playedPlayerAsset || playedRequireAsset || playedNumberAsset) {
       return;
@@ -435,7 +452,7 @@ class AudioService {
     }
 
     return _playAssetFile(
-      '$_defaultPackAssetBasePath/player-$playerNumber.mp3',
+      '$_defaultPackAssetBasePath/player-$playerNumber.wav',
       waitForCompletion: true,
     );
   }
@@ -465,7 +482,9 @@ class AudioService {
     }
 
     await speak(
-      isClassic ? '$playerName wirft Classic.' : '$playerName wirft $turnScore Punkte.',
+      isClassic
+          ? '$playerName wirft Classic.'
+          : '$playerName wirft $turnScore Punkte.',
     );
   }
 
@@ -583,23 +602,23 @@ class AudioService {
   String? _defaultAssetPathForEvent(AudioEventType eventType) {
     switch (eventType) {
       case AudioEventType.dartHit:
-        return '$_defaultPackAssetBasePath/dart_hit.mp3';
+        return '$_defaultPackAssetBasePath/dart_hit.wav';
 
       case AudioEventType.dartMiss:
-        return '$_defaultPackAssetBasePath/miss.mp3';
+        return '$_defaultPackAssetBasePath/miss.wav';
 
       case AudioEventType.gameStart:
-        return '$_defaultPackAssetBasePath/gameon.mp3';
+        return '$_defaultPackAssetBasePath/gameon.wav';
 
       case AudioEventType.bust:
-        return '$_defaultPackAssetBasePath/you-bust.mp3';
+        return '$_defaultPackAssetBasePath/you-bust.wav';
 
       case AudioEventType.legWin:
       case AudioEventType.setWin:
-        return '$_defaultPackAssetBasePath/gewonnen.mp3';
+        return '$_defaultPackAssetBasePath/gewonnen.wav';
 
       case AudioEventType.matchWin:
-        return '$_defaultPackAssetBasePath/win.mp3';
+        return '$_defaultPackAssetBasePath/win.wav';
 
       case AudioEventType.undo:
         return null;
@@ -621,7 +640,7 @@ class AudioService {
 
     _voicePackQueue = _voicePackQueue.then((_) async {
       playedRequire = await _playAssetFile(
-        '$_defaultPackAssetBasePath/you-require.mp3',
+        '$_defaultPackAssetBasePath/you-require.wav',
         waitForCompletion: true,
       );
     });
@@ -642,7 +661,7 @@ class AudioService {
 
     _voicePackQueue = _voicePackQueue.then((_) async {
       playedClassic = await _playAssetFile(
-        '$_defaultPackAssetBasePath/classic.mp3',
+        '$_defaultPackAssetBasePath/classic.wav',
         waitForCompletion: true,
       );
     });
@@ -682,6 +701,10 @@ class AudioService {
     String filePath, {
     required bool waitForCompletion,
   }) async {
+    if (!_isWavPath(filePath)) {
+      return false;
+    }
+
     final AudioPlayer player = AudioPlayer();
 
     try {
@@ -720,6 +743,10 @@ class AudioService {
     String assetPath, {
     required bool waitForCompletion,
   }) async {
+    if (!_isWavPath(assetPath)) {
+      return false;
+    }
+
     final AudioPlayer player = AudioPlayer();
 
     try {
@@ -729,7 +756,8 @@ class AudioService {
         volume: _settings.volume,
       );
 
-      final Duration fallbackDuration = await _playbackDurationForAsset(assetPath);
+      final Duration fallbackDuration =
+          await _playbackDurationForAsset(assetPath);
 
       if (waitForCompletion) {
         await _waitForPlayerCompletion(
@@ -754,45 +782,47 @@ class AudioService {
   }
 
   Future<Duration> _playbackDurationForAsset(String assetPath) async {
-    final String normalizedPath = assetPath.toLowerCase();
+    final Duration? wavDuration = await _readAssetWavDuration(assetPath);
 
-    if (normalizedPath.endsWith('.wav')) {
-      final Duration? wavDuration = await _readAssetWavDuration(assetPath);
-
-      if (wavDuration != null) {
-        return wavDuration + const Duration(milliseconds: 220);
-      }
+    if (wavDuration != null) {
+      return wavDuration + const Duration(milliseconds: 220);
     }
 
-    if (normalizedPath.endsWith('/gameon.mp3')) {
+    final String normalizedPath = assetPath.toLowerCase().replaceAll('\\', '/');
+
+    if (normalizedPath.endsWith('/gameon.wav')) {
       return const Duration(milliseconds: 2600);
     }
 
-    if (normalizedPath.endsWith('/gewonnen.mp3')) {
+    if (normalizedPath.endsWith('/gewonnen.wav')) {
       return const Duration(milliseconds: 2800);
     }
 
-    if (normalizedPath.endsWith('/win.mp3')) {
+    if (normalizedPath.endsWith('/win.wav')) {
       return const Duration(milliseconds: 4200);
     }
 
-    if (normalizedPath.endsWith('/you-require.mp3')) {
+    if (normalizedPath.endsWith('/you-require.wav')) {
       return const Duration(milliseconds: 1800);
     }
 
-    if (normalizedPath.endsWith('/you-bust.mp3')) {
+    if (normalizedPath.endsWith('/you-bust.wav')) {
       return const Duration(milliseconds: 2400);
     }
 
-    if (normalizedPath.endsWith('/dart_hit.mp3')) {
+    if (normalizedPath.endsWith('/dart_hit.wav')) {
       return const Duration(milliseconds: 900);
     }
 
-    if (normalizedPath.endsWith('/miss.mp3')) {
+    if (normalizedPath.endsWith('/miss.wav')) {
       return const Duration(milliseconds: 1100);
     }
 
-    if (RegExp(r'/player-\d+\.mp3$').hasMatch(normalizedPath)) {
+    if (normalizedPath.endsWith('/classic.wav')) {
+      return const Duration(milliseconds: 2200);
+    }
+
+    if (RegExp(r'/player-\d+\.wav$').hasMatch(normalizedPath)) {
       return const Duration(milliseconds: 2400);
     }
 
@@ -800,15 +830,13 @@ class AudioService {
   }
 
   Future<Duration> _playbackDurationForDeviceFile(String filePath) async {
-    final String normalizedPath = filePath.toLowerCase();
+    final Duration? wavDuration = await _readDeviceWavDuration(filePath);
 
-    if (normalizedPath.endsWith('.wav')) {
-      final Duration? wavDuration = await _readDeviceWavDuration(filePath);
-
-      if (wavDuration != null) {
-        return wavDuration + const Duration(milliseconds: 180);
-      }
+    if (wavDuration != null) {
+      return wavDuration + const Duration(milliseconds: 180);
     }
+
+    final String normalizedPath = filePath.toLowerCase();
 
     if (normalizedPath.contains('hit') ||
         normalizedPath.contains('dart') ||
@@ -1001,6 +1029,24 @@ Add-Type -AssemblyName System.Speech;
     } catch (_) {
       // Audio darf niemals das Match blockieren.
     }
+  }
+
+  Map<String, String> _wavOnlyPaths(Map<String, String> source) {
+    final Map<String, String> nextPaths = {};
+
+    for (final entry in source.entries) {
+      final String cleanPath = entry.value.trim();
+
+      if (_isWavPath(cleanPath)) {
+        nextPaths[entry.key] = cleanPath;
+      }
+    }
+
+    return nextPaths;
+  }
+
+  bool _isWavPath(String path) {
+    return path.trim().toLowerCase().endsWith('.wav');
   }
 
   Future<File> _settingsFile() async {

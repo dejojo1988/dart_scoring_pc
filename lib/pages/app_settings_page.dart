@@ -9,14 +9,14 @@ import '../services/appearance_service.dart';
 import '../services/audio_service.dart';
 import '../services/update_service.dart';
 
-class AudioSettingsPage extends StatefulWidget {
-  const AudioSettingsPage({super.key});
+class AppSettingsPage extends StatefulWidget {
+  const AppSettingsPage({super.key});
 
   @override
-  State<AudioSettingsPage> createState() => _AudioSettingsPageState();
+  State<AppSettingsPage> createState() => _AppSettingsPageState();
 }
 
-class _AudioSettingsPageState extends State<AudioSettingsPage>
+class _AppSettingsPageState extends State<AppSettingsPage>
     with SingleTickerProviderStateMixin {
   late TabController tabController;
 
@@ -122,9 +122,9 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
   Future<void> _pickFile(AudioEventType eventType) async {
     final FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['mp3', 'wav'],
+      allowedExtensions: ['wav'],
       allowMultiple: false,
-      dialogTitle: 'Audio für "${eventType.title}" auswählen',
+      dialogTitle: 'WAV-Audio für "${eventType.title}" auswählen',
     );
 
     if (result == null || result.files.isEmpty) {
@@ -138,13 +138,18 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
       return;
     }
 
+    if (!filePath.trim().toLowerCase().endsWith('.wav')) {
+      _showMessage('Bitte eine WAV-Datei auswählen.');
+      return;
+    }
+
     await AudioService.instance.setAudioFile(
       eventType: eventType,
       filePath: filePath,
     );
 
     await _loadSettings();
-    _showMessage('Audio für "${eventType.title}" gespeichert.');
+    _showMessage('WAV-Audio für "${eventType.title}" gespeichert.');
   }
 
   Future<void> _clearFile(AudioEventType eventType) async {
@@ -174,7 +179,8 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
 
   Future<void> _refreshDatabaseBackups() async {
     final File databaseFile = await AppDatabase.instance.getDatabaseFile();
-    final Directory backupDirectory = await AppDatabase.instance.getBackupDirectory();
+    final Directory backupDirectory =
+        await AppDatabase.instance.getBackupDirectory();
     final List<DatabaseBackupInfo> backups =
         await AppDatabase.instance.getDatabaseBackups();
 
@@ -248,12 +254,15 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
     });
 
     try {
-      final Directory backupDirectory = await AppDatabase.instance.getBackupDirectory();
+      final Directory backupDirectory =
+          await AppDatabase.instance.getBackupDirectory();
 
       if (Platform.isWindows) {
         await Process.run('explorer', [backupDirectory.path]);
       } else {
-        throw UnsupportedError('Ordner öffnen wird aktuell nur unter Windows unterstützt.');
+        throw UnsupportedError(
+          'Ordner öffnen wird aktuell nur unter Windows unterstützt.',
+        );
       }
 
       if (!mounted) {
@@ -643,7 +652,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              liveAccentColor.withValues(alpha:0.20),
+              liveAccentColor.withValues(alpha: 0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -699,10 +708,10 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withValues(alpha:0.13),
+            color: accentColor.withValues(alpha: 0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withValues(alpha:0.25),
+              color: accentColor.withValues(alpha: 0.25),
             ),
           ),
           child: Icon(
@@ -886,7 +895,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                 ),
                 const SizedBox(height: 18),
                 const Text(
-                  'Wichtig: MP3/WAV-Dateien werden nicht kopiert, sondern über den gespeicherten Dateipfad abgespielt. Lege deine Sounds am besten in einen festen Ordner, den du nicht verschiebst.',
+                  'Wichtig: WAV-Dateien werden nicht kopiert, sondern über den gespeicherten Dateipfad abgespielt. Lege deine Sounds am besten in einen festen Ordner, den du nicht verschiebst.',
                   style: TextStyle(
                     color: Color(0xFF9DA8B7),
                     fontSize: 13,
@@ -903,7 +912,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
           flex: 12,
           child: _Panel(
             title: 'Events',
-            subtitle: 'MP3 / WAV',
+            subtitle: 'WAV',
             accentColor: accentColor,
             child: ListView.separated(
               itemCount: AudioEventType.values.length,
@@ -1259,7 +1268,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                   padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
                     color: hasUpdate
-                        ? accentColor.withValues(alpha:0.11)
+                        ? accentColor.withValues(alpha: 0.11)
                         : const Color(0xFF141A22),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
@@ -1390,7 +1399,6 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
     );
   }
 
-
   Widget _buildDataBackupTab(Color accentColor) {
     return Row(
       children: [
@@ -1439,7 +1447,8 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
                   icon: Icons.restore_rounded,
                   accentColor: const Color(0xFFFFC857),
                   isLoading: isRestoringDataBackup,
-                  onTap: _isDataBackupBusy ? null : _pickAndRestoreDatabaseBackup,
+                  onTap:
+                      _isDataBackupBusy ? null : _pickAndRestoreDatabaseBackup,
                 ),
                 const SizedBox(height: 20),
                 Container(
@@ -1530,9 +1539,7 @@ class _AudioSettingsPageState extends State<AudioSettingsPage>
       ],
     );
   }
-
 }
-
 
 class _DataActionCard extends StatelessWidget {
   final String title;
@@ -1972,7 +1979,7 @@ class _AudioEventCard extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: accentColor.withValues(alpha:0.13),
+              color: accentColor.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(17),
             ),
             child: Icon(
@@ -2030,7 +2037,7 @@ class _AudioEventCard extends StatelessWidget {
             icon: Icons.play_arrow_rounded,
             label: 'Test',
             color: accentColor,
-            onTap: hasFile ? onTest : null,
+            onTap: onTest,
           ),
           const SizedBox(width: 8),
           _SmallButton(
@@ -2115,7 +2122,7 @@ class _AppearancePreview extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: accentColor.withValues(alpha:0.12),
+            color: accentColor.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(26),
             border: Border.all(
               color: accentColor,
@@ -2223,8 +2230,9 @@ class _PreviewTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
-        color:
-            active ? accentColor.withValues(alpha:0.14) : const Color(0xFF141A22),
+        color: active
+            ? accentColor.withValues(alpha: 0.14)
+            : const Color(0xFF141A22),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: active ? accentColor : const Color(0xFF2A3545),
