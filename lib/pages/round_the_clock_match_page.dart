@@ -22,13 +22,41 @@ class RoundTheClockMatchPage extends StatefulWidget {
   State<RoundTheClockMatchPage> createState() => _RoundTheClockMatchPageState();
 }
 
+class _RtcLegRecord {
+  final String playerId;
+  final String gameType;
+  final int turnScore;
+  final int dartCount;
+  final String createdAt;
+
+  const _RtcLegRecord({
+    required this.playerId,
+    required this.gameType,
+    required this.turnScore,
+    required this.dartCount,
+    required this.createdAt,
+  });
+
+  Map<String, Object> toMap() {
+    return {
+      'player_id': playerId,
+      'game_type': gameType,
+      'turn_score': turnScore,
+      'dart_count': dartCount,
+      'created_at': createdAt,
+    };
+  }
+}
+
 class _RoundSnapshot {
   final int activePlayerIndex;
   final Map<String, int> playerTargets;
   final Map<String, int> legsWon;
   final Map<String, int> matchLegsWon;
   final Map<String, int> setsWon;
+  final Map<String, int> legDartsThrown;
   final List<DartThrow> currentTurnDarts;
+  final List<_RtcLegRecord> recordedRtcLegs;
   final String message;
   final bool matchFinished;
   final Player? matchWinner;
@@ -39,7 +67,9 @@ class _RoundSnapshot {
     required this.legsWon,
     required this.matchLegsWon,
     required this.setsWon,
+    required this.legDartsThrown,
     required this.currentTurnDarts,
+    required this.recordedRtcLegs,
     required this.message,
     required this.matchFinished,
     required this.matchWinner,
@@ -54,9 +84,11 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
   late Map<String, int> legsWon;
   late Map<String, int> matchLegsWon;
   late Map<String, int> setsWon;
+  late Map<String, int> legDartsThrown;
 
   final List<DartThrow> currentTurnDarts = [];
   final List<_RoundSnapshot> history = [];
+  final List<_RtcLegRecord> recordedRtcLegs = [];
 
   String message = 'Round the Clock gestartet.';
   bool matchFinished = false;
@@ -89,6 +121,10 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
       for (final player in widget.players) player.id: 0,
     };
 
+    legDartsThrown = {
+      for (final player in widget.players) player.id: 0,
+    };
+
     message = '${activePlayer.name} beginnt bei Ziel 1.';
   }
 
@@ -102,6 +138,10 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
 
   String get activeTargetLabel {
     return _targetLabel(activeTarget);
+  }
+
+  int get activeLegDartsThrown {
+    return legDartsThrown[activePlayer.id] ?? 0;
   }
 
   String get matchProgressLabel {
@@ -120,7 +160,9 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
         legsWon: Map<String, int>.from(legsWon),
         matchLegsWon: Map<String, int>.from(matchLegsWon),
         setsWon: Map<String, int>.from(setsWon),
+        legDartsThrown: Map<String, int>.from(legDartsThrown),
         currentTurnDarts: List<DartThrow>.from(currentTurnDarts),
+        recordedRtcLegs: List<_RtcLegRecord>.from(recordedRtcLegs),
         message: message,
         matchFinished: matchFinished,
         matchWinner: matchWinner,
@@ -141,10 +183,13 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
     final bool isHit = _isCorrectHit(dartThrow, targetBeforeThrow);
 
     currentTurnDarts.add(dartThrow);
+    legDartsThrown[throwingPlayer.id] =
+        (legDartsThrown[throwingPlayer.id] ?? 0) + 1;
 
     if (isHit) {
       if (targetBeforeThrow >= 21) {
         setState(() {
+          _recordRtcLegWin(throwingPlayer);
           _handleLegWin(throwingPlayer);
         });
 
@@ -176,6 +221,28 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
         _moveToNextPlayer();
       }
     });
+  }
+
+  void _recordRtcLegWin(Player winner) {
+    if (!winner.id.startsWith('profile_')) {
+      return;
+    }
+
+    final int dartCount = legDartsThrown[winner.id] ?? 0;
+
+    if (dartCount <= 0) {
+      return;
+    }
+
+    recordedRtcLegs.add(
+      _RtcLegRecord(
+        playerId: winner.id,
+        gameType: 'rtc',
+        turnScore: 0,
+        dartCount: dartCount,
+        createdAt: DateTime.now().toIso8601String(),
+      ),
+    );
   }
 
   bool _isCorrectHit(DartThrow dartThrow, int target) {
@@ -256,6 +323,7 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
   void _resetTargetsForNextLeg(Player startingPlayer) {
     for (final player in widget.players) {
       playerTargets[player.id] = 1;
+      legDartsThrown[player.id] = 0;
     }
 
     final int winnerIndex = widget.players.indexWhere(
@@ -303,9 +371,13 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
       legsWon = Map<String, int>.from(snapshot.legsWon);
       matchLegsWon = Map<String, int>.from(snapshot.matchLegsWon);
       setsWon = Map<String, int>.from(snapshot.setsWon);
+      legDartsThrown = Map<String, int>.from(snapshot.legDartsThrown);
       currentTurnDarts
         ..clear()
         ..addAll(snapshot.currentTurnDarts);
+      recordedRtcLegs
+        ..clear()
+        ..addAll(snapshot.recordedRtcLegs);
       message = snapshot.message;
       matchFinished = snapshot.matchFinished;
       matchWinner = snapshot.matchWinner;
@@ -318,6 +390,10 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
     if (!matchFinished || winner == null || matchResultSaved) {
       return;
     }
+
+    await AppDatabase.instance.insertMatchDartTurns(
+      turns: recordedRtcLegs.map((leg) => leg.toMap()).toList(),
+    );
 
     await AppDatabase.instance.saveMatchResult(
       players: widget.players,
@@ -587,6 +663,7 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
                   isActive: index == activePlayerIndex && !matchFinished,
                   legsWon: legsWon[player.id] ?? 0,
                   setsWon: setsWon[player.id] ?? 0,
+                  legDartsThrown: legDartsThrown[player.id] ?? 0,
                 );
               },
             ),
@@ -671,7 +748,7 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
                 if (!matchFinished) ...[
                   const SizedBox(height: 6),
                   Text(
-                    'Aktuelles Ziel: $activeTargetLabel',
+                    'Aktuelles Ziel: $activeTargetLabel · Darts im Leg: $activeLegDartsThrown',
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: accentColor,
@@ -757,7 +834,7 @@ class _RoundTheClockMatchPageState extends State<RoundTheClockMatchPage> {
                   ? matchResultSaved
                       ? 'Match beendet · Ergebnis gespeichert'
                       : 'Match beendet · Ergebnis wird beim Zurückgehen gespeichert'
-                  : '${activePlayer.name} braucht Ziel $activeTargetLabel',
+                  : '${activePlayer.name} braucht Ziel $activeTargetLabel · Darts im Leg: $activeLegDartsThrown',
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Color(0xFF9DA8B7),
@@ -788,6 +865,7 @@ class _RoundPlayerCard extends StatelessWidget {
   final bool isActive;
   final int legsWon;
   final int setsWon;
+  final int legDartsThrown;
 
   const _RoundPlayerCard({
     required this.player,
@@ -796,6 +874,7 @@ class _RoundPlayerCard extends StatelessWidget {
     required this.isActive,
     required this.legsWon,
     required this.setsWon,
+    required this.legDartsThrown,
   });
 
   double get progress {
@@ -850,7 +929,7 @@ class _RoundPlayerCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Legs $legsWon · Sets $setsWon',
+                  'Legs $legsWon · Sets $setsWon · Darts $legDartsThrown',
                   style: const TextStyle(
                     color: Color(0xFF9DA8B7),
                     fontSize: 13,
