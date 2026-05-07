@@ -12,7 +12,9 @@ class PlayerScoreCard extends StatelessWidget {
   final double matchAverage;
   final double legAverage;
   final int classicCount;
+  final int lastTurnScore;
   final String lastTurnText;
+  final int legDartsThrown;
   final String? botInfoText;
   final String? statusText;
 
@@ -27,7 +29,9 @@ class PlayerScoreCard extends StatelessWidget {
     required this.matchAverage,
     required this.legAverage,
     required this.classicCount,
+    required this.lastTurnScore,
     required this.lastTurnText,
+    required this.legDartsThrown,
     this.botInfoText,
     this.statusText,
   });
@@ -39,7 +43,7 @@ class PlayerScoreCard extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
-      height: isActive ? 272 : 92,
+      height: isActive ? 248 : 92,
       padding: EdgeInsets.all(isActive ? 16 : 12),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -72,11 +76,11 @@ class PlayerScoreCard extends StatelessWidget {
                 remainingScore: remainingScore,
                 legsWon: legsWon,
                 setsWon: setsWon,
-                checkoutText: checkoutText,
                 matchAverage: matchAverage,
                 legAverage: legAverage,
-                classicCount: classicCount,
+                lastTurnScore: lastTurnScore,
                 lastTurnText: lastTurnText,
+                legDartsThrown: legDartsThrown,
                 botInfoText: botInfoText,
                 statusText: statusText,
                 accentColor: accentColor,
@@ -101,11 +105,11 @@ class _ActivePlayerCardContent extends StatelessWidget {
   final int remainingScore;
   final int legsWon;
   final int setsWon;
-  final String? checkoutText;
   final double matchAverage;
   final double legAverage;
-  final int classicCount;
+  final int lastTurnScore;
   final String lastTurnText;
+  final int legDartsThrown;
   final String? botInfoText;
   final String? statusText;
   final Color accentColor;
@@ -116,11 +120,11 @@ class _ActivePlayerCardContent extends StatelessWidget {
     required this.remainingScore,
     required this.legsWon,
     required this.setsWon,
-    required this.checkoutText,
     required this.matchAverage,
     required this.legAverage,
-    required this.classicCount,
+    required this.lastTurnScore,
     required this.lastTurnText,
+    required this.legDartsThrown,
     required this.botInfoText,
     required this.statusText,
     required this.accentColor,
@@ -180,7 +184,7 @@ class _ActivePlayerCardContent extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             SizedBox(
-              width: 104,
+              width: 112,
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
@@ -188,7 +192,7 @@ class _ActivePlayerCardContent extends StatelessWidget {
                   '$remainingScore',
                   maxLines: 1,
                   style: TextStyle(
-                    fontSize: 52,
+                    fontSize: 56,
                     height: 0.95,
                     fontWeight: FontWeight.w900,
                     color: accentColor,
@@ -218,23 +222,18 @@ class _ActivePlayerCardContent extends StatelessWidget {
                     accentColor: accentColor,
                   ),
                   _InfoPill(
-                    label: 'CLASSICS',
-                    value: '$classicCount',
+                    label: 'LETZTER WURF',
+                    value: _lastTurnScoreText(
+                      lastTurnScore: lastTurnScore,
+                      lastTurnText: lastTurnText,
+                    ),
                     accentColor: accentColor,
                   ),
                   _InfoPill(
-                    label: 'LETZTER WURF',
-                    value: lastTurnText,
+                    label: 'DARTS IM LEG',
+                    value: '$legDartsThrown',
                     accentColor: accentColor,
-                    wide: true,
                   ),
-                  if (checkoutText != null && checkoutText!.trim().isNotEmpty)
-                    _InfoPill(
-                      label: 'CHECKOUT',
-                      value: checkoutText!,
-                      accentColor: accentColor,
-                      wide: true,
-                    ),
                   if (botInfoText != null && botInfoText!.trim().isNotEmpty)
                     _InfoPill(
                       label: 'BOT',
@@ -422,4 +421,15 @@ String _averageText(double value) {
   }
 
   return value.toStringAsFixed(1);
+}
+
+String _lastTurnScoreText({
+  required int lastTurnScore,
+  required String lastTurnText,
+}) {
+  if (lastTurnText.trim().isEmpty || lastTurnText.trim() == '-') {
+    return '-';
+  }
+
+  return '$lastTurnScore';
 }

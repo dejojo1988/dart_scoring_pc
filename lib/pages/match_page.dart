@@ -383,7 +383,6 @@ class _MatchPageState extends State<MatchPage> {
     return null;
   }
 
-
   Future<void> _runMatchStartSequence() async {
     await _loadBotSkillFromCurrentPlayerStats();
 
@@ -1832,11 +1831,14 @@ class _MatchPageState extends State<MatchPage> {
                   isActive: isActiveCard,
                   legsWon: legsWon[player.id] ?? 0,
                   setsWon: setsWon[player.id] ?? 0,
-                  checkoutText: isActiveCard ? _checkoutTextForPlayer(player) : null,
+                  checkoutText:
+                      isActiveCard ? _checkoutTextForPlayer(player) : null,
                   matchAverage: _matchAverageForPlayer(player),
                   legAverage: _legAverageForPlayer(player),
                   classicCount: _classicCountForPlayer(player),
+                  lastTurnScore: lastTurnScore[player.id] ?? 0,
                   lastTurnText: _lastTurnTextForPlayer(player),
+                  legDartsThrown: legDartsThrown[player.id] ?? 0,
                   botInfoText: _botInfoForPlayer(player),
                   statusText: _statusTextForPlayer(player),
                 );
