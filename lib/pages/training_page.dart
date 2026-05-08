@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/app_database.dart';
 import '../models/player.dart';
 import 'spread_analysis_session_page.dart';
+import 'training_stats_page.dart';
 
 class TrainingPage extends StatefulWidget {
   const TrainingPage({super.key});
@@ -56,6 +57,14 @@ class _TrainingPageState extends State<TrainingPage> {
     );
   }
 
+  void _openTrainingStats() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TrainingStatsPage(),
+      ),
+    );
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
@@ -100,6 +109,8 @@ class _TrainingPageState extends State<TrainingPage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _buildIntroCard(context),
+                            const SizedBox(height: 22),
+                            _buildStatsShortcutCard(context),
                             const SizedBox(height: 22),
                             _buildSpreadAnalysisCard(context),
                           ],
@@ -232,6 +243,86 @@ class _TrainingPageState extends State<TrainingPage> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsShortcutCard(BuildContext context) {
+    final Color accentColor = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F151D).withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: const Color(0xFF243244),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              Icons.query_stats_rounded,
+              color: accentColor,
+              size: 29,
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Trainingsstatistik',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 5),
+                Text(
+                  'Sieh dir gespeicherte Sessions, beste Scores, häufige Ziele und die letzten Empfehlungen an.',
+                  style: TextStyle(
+                    color: Color(0xFF9DA8B7),
+                    fontSize: 13,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 18),
+          SizedBox(
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: _openTrainingStats,
+              icon: const Icon(Icons.bar_chart_rounded),
+              label: const Text('Statistik anzeigen'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: accentColor,
+                side: BorderSide(
+                  color: accentColor.withValues(alpha: 0.55),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(17),
+                ),
+              ),
             ),
           ),
         ],

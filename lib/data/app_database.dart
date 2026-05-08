@@ -1399,6 +1399,39 @@ class AppDatabase {
     });
   }
 
+  Future<TrainingStatsSummary> getTrainingStatsSummary(String playerId) async {
+    final Database db = await database;
+
+    final List<Map<String, Object?>> rows = await db.query(
+      'training_sessions',
+      where: 'player_id = ?',
+      whereArgs: [playerId],
+      orderBy: 'finished_at DESC, started_at DESC',
+    );
+
+    return TrainingStatsSummary.fromRows(
+      playerId: playerId,
+      rows: rows,
+    );
+  }
+
+  Future<List<TrainingSessionListItem>> getRecentTrainingSessions({
+    required String playerId,
+    int limit = 10,
+  }) async {
+    final Database db = await database;
+
+    final List<Map<String, Object?>> rows = await db.query(
+      'training_sessions',
+      where: 'player_id = ?',
+      whereArgs: [playerId],
+      orderBy: 'finished_at DESC, started_at DESC',
+      limit: limit,
+    );
+
+    return rows.map(TrainingSessionListItem.fromRow).toList();
+  }
+
   Future<void> _ensurePlayerStatsRow(String playerId) async {
     final Database db = await database;
 
@@ -1489,6 +1522,243 @@ class AppDatabase {
       'form_score': 0,
       'form_darts': 0,
     };
+  }
+}
+
+class TrainingStatsSummary {
+  final String playerId;
+  final int sessionCount;
+  final int totalDarts;
+  final double averageDartsPerSession;
+  final double averageAccuracyScore;
+  final double averageGroupingScore;
+  final double averageConsistencyScore;
+  final double bestAccuracyScore;
+  final double bestGroupingScore;
+  final double bestConsistencyScore;
+  final String favoriteTargetLabel;
+  final String lastTargetLabel;
+  final String lastMainErrorDirection;
+  final String lastAnalysisText;
+  final String lastTipsText;
+  final DateTime? lastFinishedAt;
+  final List<TrainingSessionListItem> recentSessions;
+
+  const TrainingStatsSummary({
+    required this.playerId,
+    required this.sessionCount,
+    required this.totalDarts,
+    required this.averageDartsPerSession,
+    required this.averageAccuracyScore,
+    required this.averageGroupingScore,
+    required this.averageConsistencyScore,
+    required this.bestAccuracyScore,
+    required this.bestGroupingScore,
+    required this.bestConsistencyScore,
+    required this.favoriteTargetLabel,
+    required this.lastTargetLabel,
+    required this.lastMainErrorDirection,
+    required this.lastAnalysisText,
+    required this.lastTipsText,
+    required this.lastFinishedAt,
+    required this.recentSessions,
+  });
+
+  bool get hasSessions => sessionCount > 0;
+
+  factory TrainingStatsSummary.empty({required String playerId}) {
+    return TrainingStatsSummary(
+      playerId: playerId,
+      sessionCount: 0,
+      totalDarts: 0,
+      averageDartsPerSession: 0,
+      averageAccuracyScore: 0,
+      averageGroupingScore: 0,
+      averageConsistencyScore: 0,
+      bestAccuracyScore: 0,
+      bestGroupingScore: 0,
+      bestConsistencyScore: 0,
+      favoriteTargetLabel: '-',
+      lastTargetLabel: '-',
+      lastMainErrorDirection: '-',
+      lastAnalysisText: '',
+      lastTipsText: '',
+      lastFinishedAt: null,
+      recentSessions: const [],
+    );
+  }
+
+  factory TrainingStatsSummary.fromRows({
+    required String playerId,
+    required List<Map<String, Object?>> rows,
+  }) {
+    if (rows.isEmpty) {
+      return TrainingStatsSummary.empty(playerId: playerId);
+    }
+
+    final List<TrainingSessionListItem> sessions =
+        rows.map(TrainingSessionListItem.fromRow).toList(growable: false);
+
+    final Map<String, int> targetCounts = {};
+    int totalDarts = 0;
+    double totalAccuracy = 0;
+    double totalGrouping = 0;
+    double totalConsistency = 0;
+    double bestAccuracy = 0;
+    double bestGrouping = 0;
+    double bestConsistency = 0;
+
+    for (final TrainingSessionListItem session in sessions) {
+      totalDarts += session.dartsThrown;
+      totalAccuracy += session.accuracyScore;
+      totalGrouping += session.groupingScore;
+      totalConsistency += session.consistencyScore;
+
+      if (session.accuracyScore > bestAccuracy) {
+        bestAccuracy = session.accuracyScore;
+      }
+
+      if (session.groupingScore > bestGrouping) {
+        bestGrouping = session.groupingScore;
+      }
+
+      if (session.consistencyScore > bestConsistency) {
+        bestConsistency = session.consistencyScore;
+      }
+
+      targetCounts[session.targetLabel] =
+          (targetCounts[session.targetLabel] ?? 0) + 1;
+    }
+
+    final List<MapEntry<String, int>> sortedTargets =
+        targetCounts.entries.toList()
+          ..sort((a, b) {
+            final int countCompare = b.value.compareTo(a.value);
+
+            if (countCompare != 0) {
+              return countCompare;
+            }
+
+            return a.key.compareTo(b.key);
+          });
+
+    final TrainingSessionListItem lastSession = sessions.first;
+    final int sessionCount = sessions.length;
+
+    return TrainingStatsSummary(
+      playerId: playerId,
+      sessionCount: sessionCount,
+      totalDarts: totalDarts,
+      averageDartsPerSession: totalDarts / sessionCount,
+      averageAccuracyScore: totalAccuracy / sessionCount,
+      averageGroupingScore: totalGrouping / sessionCount,
+      averageConsistencyScore: totalConsistency / sessionCount,
+      bestAccuracyScore: bestAccuracy,
+      bestGroupingScore: bestGrouping,
+      bestConsistencyScore: bestConsistency,
+      favoriteTargetLabel:
+          sortedTargets.isEmpty ? '-' : sortedTargets.first.key,
+      lastTargetLabel: lastSession.targetLabel,
+      lastMainErrorDirection: lastSession.mainErrorDirection.isEmpty
+          ? '-'
+          : lastSession.mainErrorDirection,
+      lastAnalysisText: lastSession.analysisText,
+      lastTipsText: lastSession.tipsText,
+      lastFinishedAt: lastSession.finishedAt,
+      recentSessions: sessions.take(8).toList(growable: false),
+    );
+  }
+}
+
+class TrainingSessionListItem {
+  final String id;
+  final String trainingType;
+  final String targetLabel;
+  final int plannedDarts;
+  final int dartsThrown;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+  final double accuracyScore;
+  final double groupingScore;
+  final double consistencyScore;
+  final String mainErrorDirection;
+  final String analysisText;
+  final String tipsText;
+
+  const TrainingSessionListItem({
+    required this.id,
+    required this.trainingType,
+    required this.targetLabel,
+    required this.plannedDarts,
+    required this.dartsThrown,
+    required this.startedAt,
+    required this.finishedAt,
+    required this.accuracyScore,
+    required this.groupingScore,
+    required this.consistencyScore,
+    required this.mainErrorDirection,
+    required this.analysisText,
+    required this.tipsText,
+  });
+
+  factory TrainingSessionListItem.fromRow(Map<String, Object?> row) {
+    return TrainingSessionListItem(
+      id: (row['id'] ?? '').toString(),
+      trainingType: (row['training_type'] ?? '').toString(),
+      targetLabel: (row['target_label'] ?? '').toString(),
+      plannedDarts: _intFromRow(row['planned_darts']),
+      dartsThrown: _intFromRow(row['darts_thrown']),
+      startedAt: _dateFromRow(row['started_at']),
+      finishedAt: _dateFromRow(row['finished_at']),
+      accuracyScore: _doubleFromRow(row['accuracy_score']),
+      groupingScore: _doubleFromRow(row['grouping_score']),
+      consistencyScore: _doubleFromRow(row['consistency_score']),
+      mainErrorDirection: (row['main_error_direction'] ?? '').toString(),
+      analysisText: (row['analysis_text'] ?? '').toString(),
+      tipsText: (row['tips_text'] ?? '').toString(),
+    );
+  }
+
+  String get displayTrainingType {
+    if (trainingType == 'spread_analysis') {
+      return 'Streuungsanalyse';
+    }
+
+    return trainingType.isEmpty ? 'Training' : trainingType;
+  }
+
+  static int _intFromRow(Object? value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static double _doubleFromRow(Object? value) {
+    if (value is double) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static DateTime? _dateFromRow(Object? value) {
+    final String? text = value?.toString();
+
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(text);
   }
 }
 
