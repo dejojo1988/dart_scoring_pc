@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
@@ -1432,6 +1433,35 @@ class AppDatabase {
     return rows.map(TrainingSessionListItem.fromRow).toList();
   }
 
+  Future<TrainingSessionDetail?> getTrainingSessionDetail({
+    required String sessionId,
+  }) async {
+    final Database db = await database;
+
+    final List<Map<String, Object?>> sessionRows = await db.query(
+      'training_sessions',
+      where: 'id = ?',
+      whereArgs: [sessionId],
+      limit: 1,
+    );
+
+    if (sessionRows.isEmpty) {
+      return null;
+    }
+
+    final List<Map<String, Object?>> placementRows = await db.query(
+      'training_dart_placements',
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+      orderBy: 'dart_index ASC',
+    );
+
+    return TrainingSessionDetail.fromRows(
+      sessionRow: sessionRows.first,
+      placementRows: placementRows,
+    );
+  }
+
   Future<void> _ensurePlayerStatsRow(String playerId) async {
     final Database db = await database;
 
@@ -1725,6 +1755,300 @@ class TrainingSessionListItem {
     }
 
     return trainingType.isEmpty ? 'Training' : trainingType;
+  }
+
+  static int _intFromRow(Object? value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static double _doubleFromRow(Object? value) {
+    if (value is double) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static DateTime? _dateFromRow(Object? value) {
+    final String? text = value?.toString();
+
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(text);
+  }
+}
+
+class TrainingSessionDetail {
+  final String id;
+  final String playerId;
+  final String trainingType;
+  final String targetLabel;
+  final int targetSegment;
+  final String targetRing;
+  final int plannedDarts;
+  final int dartsThrown;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+  final double accuracyScore;
+  final double groupingScore;
+  final double consistencyScore;
+  final String mainErrorDirection;
+  final String analysisText;
+  final String tipsText;
+  final String metadataJson;
+  final Map<String, Object?> metadata;
+  final List<TrainingDartPlacementItem> placements;
+
+  const TrainingSessionDetail({
+    required this.id,
+    required this.playerId,
+    required this.trainingType,
+    required this.targetLabel,
+    required this.targetSegment,
+    required this.targetRing,
+    required this.plannedDarts,
+    required this.dartsThrown,
+    required this.startedAt,
+    required this.finishedAt,
+    required this.accuracyScore,
+    required this.groupingScore,
+    required this.consistencyScore,
+    required this.mainErrorDirection,
+    required this.analysisText,
+    required this.tipsText,
+    required this.metadataJson,
+    required this.metadata,
+    required this.placements,
+  });
+
+  factory TrainingSessionDetail.fromRows({
+    required Map<String, Object?> sessionRow,
+    required List<Map<String, Object?>> placementRows,
+  }) {
+    final String rawMetadata = (sessionRow['metadata_json'] ?? '{}').toString();
+
+    return TrainingSessionDetail(
+      id: (sessionRow['id'] ?? '').toString(),
+      playerId: (sessionRow['player_id'] ?? '').toString(),
+      trainingType: (sessionRow['training_type'] ?? '').toString(),
+      targetLabel: (sessionRow['target_label'] ?? '').toString(),
+      targetSegment: _intFromRow(sessionRow['target_segment']),
+      targetRing: (sessionRow['target_ring'] ?? '').toString(),
+      plannedDarts: _intFromRow(sessionRow['planned_darts']),
+      dartsThrown: _intFromRow(sessionRow['darts_thrown']),
+      startedAt: _dateFromRow(sessionRow['started_at']),
+      finishedAt: _dateFromRow(sessionRow['finished_at']),
+      accuracyScore: _doubleFromRow(sessionRow['accuracy_score']),
+      groupingScore: _doubleFromRow(sessionRow['grouping_score']),
+      consistencyScore: _doubleFromRow(sessionRow['consistency_score']),
+      mainErrorDirection: (sessionRow['main_error_direction'] ?? '').toString(),
+      analysisText: (sessionRow['analysis_text'] ?? '').toString(),
+      tipsText: (sessionRow['tips_text'] ?? '').toString(),
+      metadataJson: rawMetadata,
+      metadata: _decodeMetadata(rawMetadata),
+      placements: placementRows
+          .map(TrainingDartPlacementItem.fromRow)
+          .toList(growable: false),
+    );
+  }
+
+  String get displayTrainingType {
+    if (trainingType == 'spread_analysis') {
+      return 'Streuungsanalyse';
+    }
+
+    return trainingType.isEmpty ? 'Training' : trainingType;
+  }
+
+  String get patternHeadline {
+    final String value = _stringFromMetadata('pattern_headline');
+    return value.isEmpty ? 'Kein Muster gespeichert.' : value;
+  }
+
+  String get nextDrillText {
+    final String value = _stringFromMetadata('next_drill_text');
+    return value.isEmpty ? 'Keine nächste Übung gespeichert.' : value;
+  }
+
+  int get targetHitCount => _intFromMetadata('target_hit_count');
+  int get segmentHitCount => _intFromMetadata('segment_hit_count');
+  int get ringHitCount => _intFromMetadata('ring_hit_count');
+  int get leftMisses => _intFromMetadata('left_misses');
+  int get rightMisses => _intFromMetadata('right_misses');
+  int get highMisses => _intFromMetadata('high_misses');
+  int get lowMisses => _intFromMetadata('low_misses');
+
+  double get targetRate => _doubleFromMetadata('target_rate');
+  double get segmentRate => _doubleFromMetadata('segment_rate');
+  double get ringRate => _doubleFromMetadata('ring_rate');
+  double get averageDistance => _doubleFromMetadata('average_distance');
+  double get averageGroupingDistance =>
+      _doubleFromMetadata('average_grouping_distance');
+  double get averageHorizontalError =>
+      _doubleFromMetadata('average_horizontal_error');
+  double get averageVerticalError =>
+      _doubleFromMetadata('average_vertical_error');
+
+  String _stringFromMetadata(String key) {
+    return metadata[key]?.toString() ?? '';
+  }
+
+  int _intFromMetadata(String key) {
+    final Object? value = metadata[key];
+
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  double _doubleFromMetadata(String key) {
+    final Object? value = metadata[key];
+
+    if (value is double) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static Map<String, Object?> _decodeMetadata(String rawMetadata) {
+    try {
+      final Object? decoded = jsonDecode(rawMetadata);
+
+      if (decoded is Map<String, Object?>) {
+        return decoded;
+      }
+
+      if (decoded is Map) {
+        return decoded.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+    } catch (_) {
+      // Kaputte oder alte Metadaten dürfen die Statistikseite nicht sprengen.
+    }
+
+    return <String, Object?>{};
+  }
+
+  static int _intFromRow(Object? value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static double _doubleFromRow(Object? value) {
+    if (value is double) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static DateTime? _dateFromRow(Object? value) {
+    final String? text = value?.toString();
+
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(text);
+  }
+}
+
+class TrainingDartPlacementItem {
+  final int id;
+  final String sessionId;
+  final int dartIndex;
+  final String targetLabel;
+  final int targetSegment;
+  final String targetRing;
+  final int hitSegment;
+  final String hitRing;
+  final String hitLabel;
+  final int score;
+  final double normalizedX;
+  final double normalizedY;
+  final double distanceFromTarget;
+  final double horizontalError;
+  final double verticalError;
+  final bool isTargetHit;
+  final DateTime? createdAt;
+
+  const TrainingDartPlacementItem({
+    required this.id,
+    required this.sessionId,
+    required this.dartIndex,
+    required this.targetLabel,
+    required this.targetSegment,
+    required this.targetRing,
+    required this.hitSegment,
+    required this.hitRing,
+    required this.hitLabel,
+    required this.score,
+    required this.normalizedX,
+    required this.normalizedY,
+    required this.distanceFromTarget,
+    required this.horizontalError,
+    required this.verticalError,
+    required this.isTargetHit,
+    required this.createdAt,
+  });
+
+  factory TrainingDartPlacementItem.fromRow(Map<String, Object?> row) {
+    return TrainingDartPlacementItem(
+      id: _intFromRow(row['id']),
+      sessionId: (row['session_id'] ?? '').toString(),
+      dartIndex: _intFromRow(row['dart_index']),
+      targetLabel: (row['target_label'] ?? '').toString(),
+      targetSegment: _intFromRow(row['target_segment']),
+      targetRing: (row['target_ring'] ?? '').toString(),
+      hitSegment: _intFromRow(row['hit_segment']),
+      hitRing: (row['hit_ring'] ?? '').toString(),
+      hitLabel: (row['hit_label'] ?? '').toString(),
+      score: _intFromRow(row['score']),
+      normalizedX: _doubleFromRow(row['x']),
+      normalizedY: _doubleFromRow(row['y']),
+      distanceFromTarget: _doubleFromRow(row['distance_from_target']),
+      horizontalError: _doubleFromRow(row['horizontal_error']),
+      verticalError: _doubleFromRow(row['vertical_error']),
+      isTargetHit: _intFromRow(row['is_target_hit']) == 1,
+      createdAt: _dateFromRow(row['created_at']),
+    );
   }
 
   static int _intFromRow(Object? value) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/app_database.dart';
 import '../models/player.dart';
+import 'training_session_detail_page.dart';
 
 class TrainingStatsPage extends StatefulWidget {
   const TrainingStatsPage({super.key});
@@ -24,6 +25,20 @@ class _TrainingStatsPageState extends State<TrainingStatsPage> {
     setState(() {
       _playersFuture = AppDatabase.instance.getPlayers();
     });
+  }
+
+  void _openSessionDetail({
+    required Player player,
+    required TrainingSessionListItem session,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => TrainingSessionDetailPage(
+          player: player,
+          sessionId: session.id,
+        ),
+      ),
+    );
   }
 
   @override
@@ -307,7 +322,7 @@ class _TrainingStatsPageState extends State<TrainingStatsPage> {
             const SizedBox(height: 22),
             _buildLastAnalysisCard(summary),
             const SizedBox(height: 22),
-            _buildRecentSessionsCard(summary),
+            _buildRecentSessionsCard(summary, selectedPlayer),
           ],
         );
       },
@@ -451,7 +466,8 @@ class _TrainingStatsPageState extends State<TrainingStatsPage> {
     );
   }
 
-  Widget _buildRecentSessionsCard(TrainingStatsSummary summary) {
+  Widget _buildRecentSessionsCard(
+      TrainingStatsSummary summary, Player selectedPlayer) {
     final Color accentColor = Theme.of(context).colorScheme.primary;
 
     return Container(
@@ -501,6 +517,10 @@ class _TrainingStatsPageState extends State<TrainingStatsPage> {
                 session: session,
                 formatScore: _formatScore,
                 formatDate: _formatDate,
+                onTap: () => _openSessionDetail(
+                  player: selectedPlayer,
+                  session: session,
+                ),
               ),
             );
           }),
@@ -714,85 +734,99 @@ class _SessionTile extends StatelessWidget {
   final TrainingSessionListItem session;
   final String Function(double value) formatScore;
   final String Function(DateTime? value) formatDate;
+  final VoidCallback onTap;
 
   const _SessionTile({
     required this.session,
     required this.formatScore,
     required this.formatDate,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final Color accentColor = Theme.of(context).colorScheme.primary;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF151E29),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFF263445),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF151E29),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: const Color(0xFF263445),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  Icons.track_changes_rounded,
+                  color: accentColor,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${session.displayTrainingType} · ${session.targetLabel}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${session.dartsThrown}/${session.plannedDarts} Darts · ${formatDate(session.finishedAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF8D99AA),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _ScoreChip(
+                label: 'ACC',
+                value: formatScore(session.accuracyScore),
+              ),
+              const SizedBox(width: 8),
+              _ScoreChip(
+                label: 'GRP',
+                value: formatScore(session.groupingScore),
+              ),
+              const SizedBox(width: 8),
+              _ScoreChip(
+                label: 'KON',
+                value: formatScore(session.consistencyScore),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF8D99AA),
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              Icons.track_changes_rounded,
-              color: accentColor,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${session.displayTrainingType} · ${session.targetLabel}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${session.dartsThrown}/${session.plannedDarts} Darts · ${formatDate(session.finishedAt)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF8D99AA),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          _ScoreChip(
-            label: 'ACC',
-            value: formatScore(session.accuracyScore),
-          ),
-          const SizedBox(width: 8),
-          _ScoreChip(
-            label: 'GRP',
-            value: formatScore(session.groupingScore),
-          ),
-          const SizedBox(width: 8),
-          _ScoreChip(
-            label: 'KON',
-            value: formatScore(session.consistencyScore),
-          ),
-        ],
       ),
     );
   }
