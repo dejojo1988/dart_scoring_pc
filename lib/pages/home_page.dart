@@ -4,6 +4,7 @@ import '../app_version.dart';
 import '../widgets/app_button.dart';
 import 'game_selection_page.dart';
 import 'profiles_page.dart';
+import 'training_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -20,6 +21,14 @@ class HomePage extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const ProfilesPage(),
+      ),
+    );
+  }
+
+  void _openTraining(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const TrainingPage(),
       ),
     );
   }
@@ -61,6 +70,15 @@ class HomePage extends StatelessWidget {
                           icon: Icons.sports_score_rounded,
                           onPressed: () {
                             _openGameSelection(context);
+                          },
+                        ),
+                        AppButton(
+                          title: 'Training',
+                          subtitle:
+                              'Streuung, Ziele und Entwicklung analysieren',
+                          icon: Icons.track_changes_rounded,
+                          onPressed: () {
+                            _openTraining(context);
                           },
                         ),
                         AppButton(

@@ -58,7 +58,8 @@ class AppDatabase {
 
   Future<List<DatabaseBackupInfo>> getDatabaseBackups() async {
     final Directory backupDirectory = await getBackupDirectory();
-    final List<FileSystemEntity> entries = await backupDirectory.list().toList();
+    final List<FileSystemEntity> entries =
+        await backupDirectory.list().toList();
 
     final List<DatabaseBackupInfo> backups = [];
 
@@ -83,7 +84,8 @@ class AppDatabase {
     return backups;
   }
 
-  Future<File> exportDatabaseBackup({required String targetDirectoryPath}) async {
+  Future<File> exportDatabaseBackup(
+      {required String targetDirectoryPath}) async {
     final Database db = await database;
     await _checkpointDatabaseIfPossible(db);
 
@@ -113,7 +115,8 @@ class AppDatabase {
     return databaseFile.copy(exportPath);
   }
 
-  Future<void> restoreDatabaseFromBackup({required String backupFilePath}) async {
+  Future<void> restoreDatabaseFromBackup(
+      {required String backupFilePath}) async {
     final File backupFile = File(backupFilePath);
 
     if (!await backupFile.exists()) {
@@ -169,7 +172,7 @@ class AppDatabase {
     return databaseFactory.openDatabase(
       fullPath,
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onConfigure: (Database database) async {
           await database.execute('PRAGMA foreign_keys = ON');
         },
@@ -180,8 +183,7 @@ class AppDatabase {
   }
 
   Future<Directory> _getDatabaseDirectory() async {
-    final String basePath =
-        Platform.environment['APPDATA'] ??
+    final String basePath = Platform.environment['APPDATA'] ??
         Platform.environment['LOCALAPPDATA'] ??
         Directory.current.path;
 
@@ -318,7 +320,8 @@ class AppDatabase {
 
   Future<void> _cleanupOldBackups(Directory backupDirectory) async {
     try {
-      final List<FileSystemEntity> entries = await backupDirectory.list().toList();
+      final List<FileSystemEntity> entries =
+          await backupDirectory.list().toList();
 
       final List<File> backups = entries.whereType<File>().where((file) {
         return path.basename(file.path).toLowerCase().endsWith('.db');
@@ -354,6 +357,7 @@ class AppDatabase {
     await _createPlayerStatsTable(database);
     await _createMatchDartsTable(database);
     await _createX01DartsTable(database);
+    await _createTrainingTables(database);
   }
 
   Future<void> _upgradeDatabase(
@@ -372,6 +376,10 @@ class AppDatabase {
 
     if (oldVersion < 4) {
       await _createX01DartsTable(database);
+    }
+
+    if (oldVersion < 5) {
+      await _createTrainingTables(database);
     }
   }
 
@@ -463,6 +471,84 @@ class AppDatabase {
     await database.execute('''
       CREATE INDEX IF NOT EXISTS idx_x01_darts_checkout
       ON x01_darts (player_id, is_checkout_dart)
+    ''');
+  }
+
+  Future<void> _createTrainingTables(Database database) async {
+    await database.execute('''
+      CREATE TABLE IF NOT EXISTS training_sessions (
+        id TEXT PRIMARY KEY,
+        player_id TEXT NOT NULL,
+        training_type TEXT NOT NULL,
+        target_label TEXT NOT NULL,
+        target_segment INTEGER NOT NULL,
+        target_ring TEXT NOT NULL,
+        planned_darts INTEGER NOT NULL,
+        darts_thrown INTEGER NOT NULL DEFAULT 0,
+        started_at TEXT NOT NULL,
+        finished_at TEXT,
+        accuracy_score REAL NOT NULL DEFAULT 0,
+        grouping_score REAL NOT NULL DEFAULT 0,
+        consistency_score REAL NOT NULL DEFAULT 0,
+        main_error_direction TEXT NOT NULL DEFAULT '',
+        analysis_text TEXT NOT NULL DEFAULT '',
+        tips_text TEXT NOT NULL DEFAULT '',
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS idx_training_sessions_player_id
+      ON training_sessions (player_id)
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS idx_training_sessions_type
+      ON training_sessions (training_type)
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS idx_training_sessions_started_at
+      ON training_sessions (started_at)
+    ''');
+
+    await database.execute('''
+      CREATE TABLE IF NOT EXISTS training_dart_placements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        dart_index INTEGER NOT NULL,
+        target_label TEXT NOT NULL,
+        target_segment INTEGER NOT NULL,
+        target_ring TEXT NOT NULL,
+        hit_segment INTEGER NOT NULL,
+        hit_ring TEXT NOT NULL,
+        hit_label TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        x REAL,
+        y REAL,
+        distance_from_target REAL NOT NULL DEFAULT 0,
+        horizontal_error REAL NOT NULL DEFAULT 0,
+        vertical_error REAL NOT NULL DEFAULT 0,
+        is_target_hit INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (session_id) REFERENCES training_sessions (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS idx_training_dart_placements_session_id
+      ON training_dart_placements (session_id)
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS idx_training_dart_placements_target
+      ON training_dart_placements (target_label)
+    ''');
+
+    await database.execute('''
+      CREATE INDEX IF NOT EXISTS idx_training_dart_placements_hit
+      ON training_dart_placements (hit_label)
     ''');
   }
 
@@ -562,6 +648,12 @@ class AppDatabase {
 
       await transaction.delete(
         'match_darts',
+        where: 'player_id = ?',
+        whereArgs: [playerId],
+      );
+
+      await transaction.delete(
+        'training_sessions',
         where: 'player_id = ?',
         whereArgs: [playerId],
       );
@@ -750,7 +842,8 @@ class AppDatabase {
       final String playerId = row['player_id'] as String;
       final int totalScore = (row['total_score'] as num).toInt();
       final int totalDarts = (row['total_darts'] as num).toInt();
-      final double average = totalDarts == 0 ? 0 : (totalScore / totalDarts) * 3;
+      final double average =
+          totalDarts == 0 ? 0 : (totalScore / totalDarts) * 3;
       final Map<String, num> formStats =
           formStatsByPlayerId[playerId] ?? _emptyFormDartStats();
 
@@ -807,8 +900,7 @@ class AppDatabase {
       formDarts += (row['dart_count'] as num).toInt();
     }
 
-    final double formAverage =
-        formDarts == 0 ? 0 : (formScore / formDarts) * 3;
+    final double formAverage = formDarts == 0 ? 0 : (formScore / formDarts) * 3;
 
     return {
       'form_average': formAverage,
@@ -961,7 +1053,9 @@ class AppDatabase {
 
       final String bustTurnKey = '$playerId|$matchId|$legNumber|$turnNumber';
 
-      classicLabelsByTurn.putIfAbsent(bustTurnKey, () => <String>[]).add(dartLabel);
+      classicLabelsByTurn
+          .putIfAbsent(bustTurnKey, () => <String>[])
+          .add(dartLabel);
       classicPlayerByTurn[bustTurnKey] = playerId;
 
       if (isBust == 1) {
@@ -1063,7 +1157,8 @@ class AppDatabase {
         continue;
       }
 
-      classicCountByPlayer[playerId] = (classicCountByPlayer[playerId] ?? 0) + 1;
+      classicCountByPlayer[playerId] =
+          (classicCountByPlayer[playerId] ?? 0) + 1;
     }
 
     final Set<String> playerIds = {
