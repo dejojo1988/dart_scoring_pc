@@ -1,10 +1,12 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../data/app_database.dart';
 import '../models/player.dart';
 import '../services/training_analysis_service.dart';
 import '../widgets/dartboard_tap_widget.dart';
+import 'spread_analysis_result_page.dart';
 
 class SpreadAnalysisSessionPage extends StatefulWidget {
   final Player player;
@@ -32,12 +34,11 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
   final DateTime _startedAt = DateTime.now();
 
   bool _isSaving = false;
-  SpreadAnalysisResult? _summary;
 
   bool get _isComplete => _hits.length >= widget.plannedDarts;
 
   void _addHit(DartboardHit hit) {
-    if (_isComplete || _summary != null) {
+    if (_isComplete || _isSaving) {
       return;
     }
 
@@ -52,7 +53,7 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
   }
 
   void _undoLastHit() {
-    if (_hits.isEmpty || _summary != null || _isSaving) {
+    if (_hits.isEmpty || _isSaving) {
       return;
     }
 
@@ -62,7 +63,7 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
   }
 
   void _resetHits() {
-    if (_hits.isEmpty || _summary != null || _isSaving) {
+    if (_hits.isEmpty || _isSaving) {
       return;
     }
 
@@ -77,7 +78,7 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
       return;
     }
 
-    if (_isSaving || _summary != null) {
+    if (_isSaving) {
       return;
     }
 
@@ -94,11 +95,29 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
       }
 
       setState(() {
-        _summary = summary;
         _isSaving = false;
       });
 
-      _showMessage('Training gespeichert.');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => SpreadAnalysisResultPage(
+            player: widget.player,
+            plannedDarts: widget.plannedDarts,
+            targetLabel: widget.targetLabel,
+            targetSegment: widget.targetSegment,
+            targetRing: widget.targetRing,
+            hits: List<DartboardHit>.unmodifiable(_hits),
+            summary: summary,
+            buildNewSessionPage: () => SpreadAnalysisSessionPage(
+              player: widget.player,
+              plannedDarts: widget.plannedDarts,
+              targetLabel: widget.targetLabel,
+              targetSegment: widget.targetSegment,
+              targetRing: widget.targetRing,
+            ),
+          ),
+        ),
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -378,12 +397,10 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
             children: [
               Icon(Icons.my_location_rounded, color: accentColor),
               const SizedBox(width: 10),
-              Expanded(
+              const Expanded(
                 child: Text(
-                  _summary == null
-                      ? 'Tippe jeden Dart dort an, wo er im Board steckt.'
-                      : 'Session gespeichert. Ergebnis unten rechts auswerten.',
-                  style: const TextStyle(
+                  'Tippe jeden Dart dort an, wo er im Board steckt. Nach dem Speichern öffnet sich die Ergebnis-Seite.',
+                  style: TextStyle(
                     color: Color(0xFFDCE5F2),
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -402,7 +419,7 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
                   targetSegment: widget.targetSegment,
                   targetRing: widget.targetRing,
                   hits: _hits,
-                  enabled: !_isComplete && _summary == null && !_isSaving,
+                  enabled: !_isComplete && !_isSaving,
                   onHit: _addHit,
                 ),
               ),
@@ -414,8 +431,6 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
   }
 
   Widget _buildSidePanel(BuildContext context) {
-    final SpreadAnalysisResult? summary = _summary;
-
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -423,27 +438,16 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFF243244)),
       ),
-      child: summary == null
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildStatsOverview(),
-                const SizedBox(height: 18),
-                _buildLastHitsList(),
-                const SizedBox(height: 18),
-                _buildActionButtons(),
-              ],
-            )
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildStatsOverview(),
-                  const SizedBox(height: 18),
-                  _buildResult(summary),
-                ],
-              ),
-            ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildStatsOverview(),
+          const SizedBox(height: 18),
+          _buildLastHitsList(),
+          const SizedBox(height: 18),
+          _buildActionButtons(),
+        ],
+      ),
     );
   }
 
@@ -614,259 +618,6 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
       ],
     );
   }
-
-  Widget _buildResult(SpreadAnalysisResult summary) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F151D),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF263445)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Analyse',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              _ScoreChip(
-                label: 'Konstanz',
-                value: summary.consistencyScore,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF151E29),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFF2A3748)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  summary.patternHeadline,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFE7EEF8),
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Hauptabweichung: ${summary.mainErrorDirection}',
-                  style: const TextStyle(
-                    color: Color(0xFF9DA8B7),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _ResultMetricBox(
-                  title: 'Accuracy',
-                  value: summary.accuracyScore.toStringAsFixed(0),
-                  subtitle: summary.accuracyLabel,
-                  icon: Icons.gps_fixed_rounded,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ResultMetricBox(
-                  title: 'Grouping',
-                  value: summary.groupingScore.toStringAsFixed(0),
-                  subtitle: summary.groupingLabel,
-                  icon: Icons.blur_on_rounded,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _ResultMetricBox(
-                  title: 'Zieltreffer',
-                  value: '${summary.targetHits}/${summary.dartsThrown}',
-                  subtitle: '${summary.targetRate.toStringAsFixed(1)} %',
-                  icon: Icons.my_location_rounded,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ResultMetricBox(
-                  title: 'Segment',
-                  value: '${summary.segmentHits}/${summary.dartsThrown}',
-                  subtitle: '${summary.segmentRate.toStringAsFixed(1)} %',
-                  icon: Icons.track_changes_rounded,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _ResultTextBlock(
-            title: 'Was die Session zeigt',
-            text: summary.analysisText,
-            icon: Icons.analytics_rounded,
-          ),
-          const SizedBox(height: 10),
-          _ResultTextBlock(
-            title: 'Tipp für den nächsten Durchgang',
-            text: summary.tipsText,
-            icon: Icons.tips_and_updates_rounded,
-          ),
-          const SizedBox(height: 10),
-          _ResultTextBlock(
-            title: 'Nächste Übung',
-            text: summary.nextDrillText,
-            icon: Icons.fitness_center_rounded,
-          ),
-          const SizedBox(height: 14),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            icon: const Icon(Icons.check_rounded),
-            label: const Text('Fertig'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ResultMetricBox extends StatelessWidget {
-  final String title;
-  final String value;
-  final String subtitle;
-  final IconData icon;
-
-  const _ResultMetricBox({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final Color accentColor = Theme.of(context).colorScheme.primary;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF151E29),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF2A3748)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: accentColor, size: 21),
-          const SizedBox(height: 9),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFF8D99AA),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: Color(0xFFB8C3D3),
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ResultTextBlock extends StatelessWidget {
-  final String title;
-  final String text;
-  final IconData icon;
-
-  const _ResultTextBlock({
-    required this.title,
-    required this.text,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final Color accentColor = Theme.of(context).colorScheme.primary;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF151E29),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF2A3748)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: accentColor, size: 21),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFFE7EEF8),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  text,
-                  style: const TextStyle(
-                    color: Color(0xFFB8C3D3),
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ProgressPill extends StatelessWidget {
@@ -1015,38 +766,6 @@ class _HitRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ScoreChip extends StatelessWidget {
-  final String label;
-  final double value;
-
-  const _ScoreChip({
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final Color accentColor = Theme.of(context).colorScheme.primary;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: accentColor.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: accentColor.withValues(alpha: 0.36)),
-      ),
-      child: Text(
-        '$label ${value.toStringAsFixed(0)}',
-        style: TextStyle(
-          color: accentColor,
-          fontWeight: FontWeight.w900,
-          fontSize: 12,
-        ),
       ),
     );
   }
