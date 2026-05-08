@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../data/app_database.dart';
 import '../models/player.dart';
+import '../services/training_analysis_service.dart';
 import '../widgets/dartboard_tap_widget.dart';
 
 class SpreadAnalysisSessionPage extends StatefulWidget {
@@ -33,7 +32,7 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
   final DateTime _startedAt = DateTime.now();
 
   bool _isSaving = false;
-  _SpreadAnalysisSummary? _summary;
+  SpreadAnalysisResult? _summary;
 
   bool get _isComplete => _hits.length >= widget.plannedDarts;
 
@@ -87,7 +86,7 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
     });
 
     try {
-      final _SpreadAnalysisSummary summary = _buildSummary();
+      final SpreadAnalysisResult summary = _buildSummary();
       await _saveSession(summary);
 
       if (!mounted) {
@@ -113,7 +112,7 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
     }
   }
 
-  Future<void> _saveSession(_SpreadAnalysisSummary summary) async {
+  Future<void> _saveSession(SpreadAnalysisResult summary) async {
     final database = await AppDatabase.instance.database;
     final DateTime finishedAt = DateTime.now();
     final String sessionId =
@@ -142,9 +141,20 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
           'metadata_json': jsonEncode({
             'target_hit_count': summary.targetHits,
             'segment_hit_count': summary.segmentHits,
+            'ring_hit_count': summary.ringHits,
+            'target_rate': summary.targetRate,
+            'segment_rate': summary.segmentRate,
+            'ring_rate': summary.ringRate,
             'average_distance': summary.averageDistance,
+            'average_grouping_distance': summary.averageGroupingDistance,
             'average_horizontal_error': summary.averageHorizontalError,
             'average_vertical_error': summary.averageVerticalError,
+            'left_misses': summary.leftMisses,
+            'right_misses': summary.rightMisses,
+            'high_misses': summary.highMisses,
+            'low_misses': summary.lowMisses,
+            'pattern_headline': summary.patternHeadline,
+            'next_drill_text': summary.nextDrillText,
             'hit_labels': _hits.map((hit) => hit.label).toList(),
           }),
         },
@@ -198,195 +208,13 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
     });
   }
 
-  _SpreadAnalysisSummary _buildSummary() {
-    final int dartsThrown = _hits.length;
-    final int targetHits = _hits.where((hit) {
-      return DartboardTapWidget.isTargetHit(
-        hit: hit,
-        targetSegment: widget.targetSegment,
-        targetRing: widget.targetRing,
-      );
-    }).length;
-
-    final int segmentHits = _hits.where((hit) {
-      return hit.segment == widget.targetSegment;
-    }).length;
-
-    final List<double> distances = _hits.map((hit) {
-      return DartboardTapWidget.distanceFromTarget(
-        hit: hit,
-        targetSegment: widget.targetSegment,
-        targetRing: widget.targetRing,
-      );
-    }).toList();
-
-    final List<double> horizontalErrors = _hits.map((hit) {
-      return DartboardTapWidget.horizontalError(
-        hit: hit,
-        targetSegment: widget.targetSegment,
-        targetRing: widget.targetRing,
-      );
-    }).toList();
-
-    final List<double> verticalErrors = _hits.map((hit) {
-      return DartboardTapWidget.verticalError(
-        hit: hit,
-        targetSegment: widget.targetSegment,
-        targetRing: widget.targetRing,
-      );
-    }).toList();
-
-    final double averageDistance =
-        distances.reduce((a, b) => a + b) / dartsThrown;
-    final double averageHorizontalError =
-        horizontalErrors.reduce((a, b) => a + b) / dartsThrown;
-    final double averageVerticalError =
-        verticalErrors.reduce((a, b) => a + b) / dartsThrown;
-
-    final double centroidX =
-        _hits.map((hit) => hit.normalizedX).reduce((a, b) => a + b) /
-            dartsThrown;
-    final double centroidY =
-        _hits.map((hit) => hit.normalizedY).reduce((a, b) => a + b) /
-            dartsThrown;
-    final double averageGroupingDistance = _hits.map((hit) {
-          final double dx = hit.normalizedX - centroidX;
-          final double dy = hit.normalizedY - centroidY;
-          return math.sqrt((dx * dx) + (dy * dy));
-        }).reduce((a, b) => a + b) /
-        dartsThrown;
-
-    final double accuracyScore =
-        (targetHits / dartsThrown * 100).clamp(0, 100).toDouble();
-    final double groupingScore =
-        (100 - (averageGroupingDistance * 130)).clamp(0, 100).toDouble();
-    final double consistencyScore =
-        ((accuracyScore * 0.35) + (groupingScore * 0.65))
-            .clamp(0, 100)
-            .toDouble();
-
-    final String mainErrorDirection = _mainErrorDirection(
-      horizontalError: averageHorizontalError,
-      verticalError: averageVerticalError,
+  SpreadAnalysisResult _buildSummary() {
+    return TrainingAnalysisService.analyze(
+      hits: _hits,
+      targetLabel: widget.targetLabel,
+      targetSegment: widget.targetSegment,
+      targetRing: widget.targetRing,
     );
-
-    final String analysisText = _analysisText(
-      accuracyScore: accuracyScore,
-      groupingScore: groupingScore,
-      segmentHits: segmentHits,
-      dartsThrown: dartsThrown,
-      mainErrorDirection: mainErrorDirection,
-    );
-
-    final String tipsText = _tipsText(
-      mainErrorDirection: mainErrorDirection,
-      groupingScore: groupingScore,
-      accuracyScore: accuracyScore,
-    );
-
-    return _SpreadAnalysisSummary(
-      dartsThrown: dartsThrown,
-      targetHits: targetHits,
-      segmentHits: segmentHits,
-      accuracyScore: accuracyScore,
-      groupingScore: groupingScore,
-      consistencyScore: consistencyScore,
-      averageDistance: averageDistance,
-      averageHorizontalError: averageHorizontalError,
-      averageVerticalError: averageVerticalError,
-      mainErrorDirection: mainErrorDirection,
-      analysisText: analysisText,
-      tipsText: tipsText,
-    );
-  }
-
-  String _mainErrorDirection({
-    required double horizontalError,
-    required double verticalError,
-  }) {
-    const double threshold = 0.08;
-
-    final String horizontal = horizontalError > threshold
-        ? 'rechts'
-        : horizontalError < -threshold
-            ? 'links'
-            : '';
-
-    final String vertical = verticalError > threshold
-        ? 'tief'
-        : verticalError < -threshold
-            ? 'hoch'
-            : '';
-
-    if (horizontal.isEmpty && vertical.isEmpty) {
-      return 'zentriert';
-    }
-
-    if (horizontal.isNotEmpty && vertical.isNotEmpty) {
-      return '$horizontal $vertical';
-    }
-
-    return horizontal.isNotEmpty ? horizontal : vertical;
-  }
-
-  String _analysisText({
-    required double accuracyScore,
-    required double groupingScore,
-    required int segmentHits,
-    required int dartsThrown,
-    required String mainErrorDirection,
-  }) {
-    final double segmentRate = segmentHits / dartsThrown * 100;
-
-    if (groupingScore >= 70 && accuracyScore < 35) {
-      return 'Deine Gruppe ist relativ eng, aber sie liegt noch nicht sauber im Ziel. Das ist kein kompletter Technik-Crash, sondern eher ein Ausrichtungsproblem.';
-    }
-
-    if (groupingScore < 45) {
-      return 'Die Darts streuen noch deutlich. Aktuell ist nicht nur das Zielproblem sichtbar, sondern vor allem fehlende Wiederholbarkeit im Wurf.';
-    }
-
-    if (segmentRate >= 55 && accuracyScore < 35) {
-      return 'Du triffst das richtige Segment schon brauchbar oft, aber der Ring passt noch nicht stabil. Die Linie stimmt besser als die Höhe beziehungsweise Tiefe.';
-    }
-
-    if (accuracyScore >= 50) {
-      return 'Die Zieltreffer sind für diese Session ordentlich. Entscheidend ist jetzt, ob du diese Genauigkeit über mehrere Sessions halten kannst.';
-    }
-
-    return 'Die Session zeigt eine erkennbare Hauptabweichung nach $mainErrorDirection. Das Ziel ist noch nicht stabil genug, aber die Richtung der Schwäche ist verwertbar.';
-  }
-
-  String _tipsText({
-    required String mainErrorDirection,
-    required double groupingScore,
-    required double accuracyScore,
-  }) {
-    if (groupingScore >= 70 && accuracyScore < 35) {
-      return 'Nicht wild am ganzen Wurf schrauben. Prüfe zuerst Stand, Schulterlinie und Zielpunkt. Eine enge Gruppe neben dem Ziel ist besser als Treffer, die komplett zufällig verteilt sind.';
-    }
-
-    if (groupingScore < 45) {
-      return 'Fokus für die nächste Einheit: gleicher Stand, gleicher Griff, gleicher Rhythmus. Erst Wiederholbarkeit stabilisieren, dann Zielkorrektur machen.';
-    }
-
-    if (mainErrorDirection.contains('rechts')) {
-      return 'Achte darauf, ob dein Arm nach dem Release nach rechts wegzieht. Follow-through bewusst gerade Richtung Ziel halten.';
-    }
-
-    if (mainErrorDirection.contains('links')) {
-      return 'Prüfe, ob du quer über den Körper ziehst oder das Handgelenk beim Release einklappt. Wurfarm gerade durch die Linie führen.';
-    }
-
-    if (mainErrorDirection.contains('hoch')) {
-      return 'Viele hohe Darts sprechen oft für zu frühen Release oder zu viel Kraft. Ruhiger werfen und den Abwurfpunkt kontrollieren.';
-    }
-
-    if (mainErrorDirection.contains('tief')) {
-      return 'Viele tiefe Darts können auf zu spätes Loslassen oder abbrechenden Follow-through hindeuten. Arm nach dem Wurf nicht sofort fallen lassen.';
-    }
-
-    return 'Die Abweichung ist nicht stark richtungsgebunden. Nächster Fokus: gleiche Routine vor jedem Wurf und bewusstes Tempo halten.';
   }
 
   void _showMessage(String message) {
@@ -586,7 +414,7 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
   }
 
   Widget _buildSidePanel(BuildContext context) {
-    final _SpreadAnalysisSummary? summary = _summary;
+    final SpreadAnalysisResult? summary = _summary;
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -595,16 +423,27 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: const Color(0xFF243244)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildStatsOverview(),
-          const SizedBox(height: 18),
-          _buildLastHitsList(),
-          const SizedBox(height: 18),
-          if (summary == null) _buildActionButtons() else _buildResult(summary),
-        ],
-      ),
+      child: summary == null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildStatsOverview(),
+                const SizedBox(height: 18),
+                _buildLastHitsList(),
+                const SizedBox(height: 18),
+                _buildActionButtons(),
+              ],
+            )
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildStatsOverview(),
+                  const SizedBox(height: 18),
+                  _buildResult(summary),
+                ],
+              ),
+            ),
     );
   }
 
@@ -776,9 +615,9 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
     );
   }
 
-  Widget _buildResult(_SpreadAnalysisSummary summary) {
+  Widget _buildResult(SpreadAnalysisResult summary) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: const Color(0xFF0F151D),
         borderRadius: BorderRadius.circular(22),
@@ -787,48 +626,116 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Analyse',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+          Row(
             children: [
-              _ScoreChip(label: 'Accuracy', value: summary.accuracyScore),
-              _ScoreChip(label: 'Grouping', value: summary.groupingScore),
-              _ScoreChip(label: 'Konstanz', value: summary.consistencyScore),
+              const Expanded(
+                child: Text(
+                  'Analyse',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              _ScoreChip(
+                label: 'Konstanz',
+                value: summary.consistencyScore,
+              ),
             ],
           ),
           const SizedBox(height: 14),
-          Text(
-            'Hauptfehler: ${summary.mainErrorDirection}',
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              color: Color(0xFFDCE5F2),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF151E29),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFF2A3748)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  summary.patternHeadline,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFE7EEF8),
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Hauptabweichung: ${summary.mainErrorDirection}',
+                  style: const TextStyle(
+                    color: Color(0xFF9DA8B7),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            summary.analysisText,
-            style: const TextStyle(
-              color: Color(0xFFB8C3D3),
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _ResultMetricBox(
+                  title: 'Accuracy',
+                  value: summary.accuracyScore.toStringAsFixed(0),
+                  subtitle: summary.accuracyLabel,
+                  icon: Icons.gps_fixed_rounded,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ResultMetricBox(
+                  title: 'Grouping',
+                  value: summary.groupingScore.toStringAsFixed(0),
+                  subtitle: summary.groupingLabel,
+                  icon: Icons.blur_on_rounded,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
-          Text(
-            summary.tipsText,
-            style: const TextStyle(
-              color: Color(0xFF9DA8B7),
-              height: 1.35,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: _ResultMetricBox(
+                  title: 'Zieltreffer',
+                  value: '${summary.targetHits}/${summary.dartsThrown}',
+                  subtitle: '${summary.targetRate.toStringAsFixed(1)} %',
+                  icon: Icons.my_location_rounded,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ResultMetricBox(
+                  title: 'Segment',
+                  value: '${summary.segmentHits}/${summary.dartsThrown}',
+                  subtitle: '${summary.segmentRate.toStringAsFixed(1)} %',
+                  icon: Icons.track_changes_rounded,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _ResultTextBlock(
+            title: 'Was die Session zeigt',
+            text: summary.analysisText,
+            icon: Icons.analytics_rounded,
+          ),
+          const SizedBox(height: 10),
+          _ResultTextBlock(
+            title: 'Tipp für den nächsten Durchgang',
+            text: summary.tipsText,
+            icon: Icons.tips_and_updates_rounded,
+          ),
+          const SizedBox(height: 10),
+          _ResultTextBlock(
+            title: 'Nächste Übung',
+            text: summary.nextDrillText,
+            icon: Icons.fitness_center_rounded,
           ),
           const SizedBox(height: 14),
           FilledButton.icon(
@@ -844,34 +751,122 @@ class _SpreadAnalysisSessionPageState extends State<SpreadAnalysisSessionPage> {
   }
 }
 
-class _SpreadAnalysisSummary {
-  final int dartsThrown;
-  final int targetHits;
-  final int segmentHits;
-  final double accuracyScore;
-  final double groupingScore;
-  final double consistencyScore;
-  final double averageDistance;
-  final double averageHorizontalError;
-  final double averageVerticalError;
-  final String mainErrorDirection;
-  final String analysisText;
-  final String tipsText;
+class _ResultMetricBox extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
 
-  const _SpreadAnalysisSummary({
-    required this.dartsThrown,
-    required this.targetHits,
-    required this.segmentHits,
-    required this.accuracyScore,
-    required this.groupingScore,
-    required this.consistencyScore,
-    required this.averageDistance,
-    required this.averageHorizontalError,
-    required this.averageVerticalError,
-    required this.mainErrorDirection,
-    required this.analysisText,
-    required this.tipsText,
+  const _ResultMetricBox({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accentColor = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151E29),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF2A3748)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: accentColor, size: 21),
+          const SizedBox(height: 9),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF8D99AA),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Color(0xFFB8C3D3),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultTextBlock extends StatelessWidget {
+  final String title;
+  final String text;
+  final IconData icon;
+
+  const _ResultTextBlock({
+    required this.title,
+    required this.text,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color accentColor = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151E29),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF2A3748)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: accentColor, size: 21),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFFE7EEF8),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Color(0xFFB8C3D3),
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ProgressPill extends StatelessWidget {
