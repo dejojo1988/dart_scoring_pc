@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as path;
 
 import '../data/app_database.dart';
 import '../models/player.dart';
+import '../services/player_name_audio_service.dart';
 
 class ProfilesPage extends StatefulWidget {
   const ProfilesPage({super.key});
@@ -18,6 +20,7 @@ class _ProfilesPageState extends State<ProfilesPage> {
 
   Player? selectedPlayer;
   bool isLoading = true;
+  bool audioActionRunning = false;
 
   @override
   void initState() {
@@ -26,37 +29,27 @@ class _ProfilesPageState extends State<ProfilesPage> {
   }
 
   Future<void> _loadPlayersAndStats() async {
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
-    final List<Player> loadedPlayers = await AppDatabase.instance.getPlayers();
-    final Map<String, Map<String, int>> loadedStats =
-        await AppDatabase.instance.getAllPlayerStats();
-    final Map<String, Map<String, num>> loadedDartStats =
-        await AppDatabase.instance.getAllPlayerDartStats();
-    final Map<String, Map<String, num>> loadedAdvancedX01Stats =
+    final loadedPlayers = await AppDatabase.instance.getPlayers();
+    final loadedStats = await AppDatabase.instance.getAllPlayerStats();
+    final loadedDartStats = await AppDatabase.instance.getAllPlayerDartStats();
+    final loadedAdvancedX01Stats =
         await AppDatabase.instance.getAllPlayerX01AdvancedStats();
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() {
-      final String? selectedId = selectedPlayer?.id;
-
+      final selectedId = selectedPlayer?.id;
       players
         ..clear()
         ..addAll(loadedPlayers);
-
       playerStatsById
         ..clear()
         ..addAll(loadedStats);
-
       playerDartStatsById
         ..clear()
         ..addAll(loadedDartStats);
-
       playerAdvancedX01StatsById
         ..clear()
         ..addAll(loadedAdvancedX01Stats);
@@ -66,624 +59,145 @@ class _ProfilesPageState extends State<ProfilesPage> {
       } else if (selectedId == null) {
         selectedPlayer = players.first;
       } else {
-        final List<Player> matchingPlayers = players.where(
+        selectedPlayer = players.firstWhere(
           (player) => player.id == selectedId,
-        ).toList();
-
-        selectedPlayer =
-            matchingPlayers.isEmpty ? players.first : matchingPlayers.first;
+          orElse: () => players.first,
+        );
       }
 
       isLoading = false;
     });
   }
 
-  void _openCreateProfileDialog() {
-    final TextEditingController nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        final Color accentColor = Theme.of(context).colorScheme.primary;
-
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(28),
-          child: Container(
-            width: 620,
-            padding: const EdgeInsets.all(26),
-            decoration: BoxDecoration(
-              color: const Color(0xFF101720),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: const Color(0xFF243040),
-                width: 1.3,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: 0.13),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: accentColor.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.person_add_alt_1_rounded,
-                        color: accentColor,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Profil anlegen',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Erstelle einen neuen Spieler',
-                            style: TextStyle(
-                              color: Color(0xFF9DA8B7),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                      },
-                      icon: const Icon(Icons.close_rounded),
-                      color: const Color(0xFF9DA8B7),
-                      iconSize: 30,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 26),
-                TextField(
-                  controller: nameController,
-                  autofocus: true,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: _inputDecoration(
-                    label: 'Spielername',
-                    hint: 'Dein Name',
-                  ),
-                  onSubmitted: (_) async {
-                    await _createProfileFromDialog(
-                      dialogContext: dialogContext,
-                      name: nameController.text,
-                    );
-                  },
-                ),
-                const SizedBox(height: 22),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _DialogButton(
-                        label: 'Abbrechen',
-                        isPrimary: false,
-                        onPressed: () {
-                          Navigator.of(dialogContext).pop();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _DialogButton(
-                        label: 'Profil speichern',
-                        isPrimary: true,
-                        onPressed: () async {
-                          await _createProfileFromDialog(
-                            dialogContext: dialogContext,
-                            name: nameController.text,
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _openEditProfileDialog(Player player) {
-    final TextEditingController nameController = TextEditingController(
-      text: player.name,
-    );
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        final Color accentColor = Theme.of(context).colorScheme.primary;
-
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(28),
-          child: Container(
-            width: 620,
-            padding: const EdgeInsets.all(26),
-            decoration: BoxDecoration(
-              color: const Color(0xFF101720),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: const Color(0xFF243040),
-                width: 1.3,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: 0.13),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: accentColor.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.edit_rounded,
-                        color: accentColor,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Profil bearbeiten',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Spielernamen ändern',
-                            style: TextStyle(
-                              color: Color(0xFF9DA8B7),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                      },
-                      icon: const Icon(Icons.close_rounded),
-                      color: const Color(0xFF9DA8B7),
-                      iconSize: 30,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 26),
-                TextField(
-                  controller: nameController,
-                  autofocus: true,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: _inputDecoration(
-                    label: 'Neuer Spielername',
-                    hint: 'z. B. Jochen',
-                  ),
-                  onSubmitted: (_) async {
-                    await _updateProfileFromDialog(
-                      dialogContext: dialogContext,
-                      player: player,
-                      newName: nameController.text,
-                    );
-                  },
-                ),
-                const SizedBox(height: 22),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _DialogButton(
-                        label: 'Abbrechen',
-                        isPrimary: false,
-                        onPressed: () {
-                          Navigator.of(dialogContext).pop();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _DialogButton(
-                        label: 'Änderung speichern',
-                        isPrimary: true,
-                        onPressed: () async {
-                          await _updateProfileFromDialog(
-                            dialogContext: dialogContext,
-                            player: player,
-                            newName: nameController.text,
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _openDeleteProfileDialog(Player player) {
-    final Map<String, int> stats = _statsForPlayer(player);
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(28),
-          child: Container(
-            width: 660,
-            padding: const EdgeInsets.all(26),
-            decoration: BoxDecoration(
-              color: const Color(0xFF101720),
-              borderRadius: BorderRadius.circular(32),
-              border: Border.all(
-                color: const Color(0xFF3A2430),
-                width: 1.3,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF5C77).withValues(alpha: 0.13),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: const Color(0xFFFF5C77).withValues(alpha: 0.35),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.delete_outline_rounded,
-                        color: Color(0xFFFF5C77),
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Profil wirklich löschen?',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            player.name,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF9DA8B7),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                      },
-                      icon: const Icon(Icons.close_rounded),
-                      color: const Color(0xFF9DA8B7),
-                      iconSize: 30,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141A22),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: const Color(0xFF2A3545),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Das wird dauerhaft gelöscht:',
-                        style: TextStyle(
-                          color: Color(0xFFEAF1F8),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _DeleteInfoLine(
-                        label: 'Profil',
-                        value: player.name,
-                      ),
-                      _DeleteInfoLine(
-                        label: 'Gespielte Spiele',
-                        value: '${stats['games_played'] ?? 0}',
-                      ),
-                      _DeleteInfoLine(
-                        label: 'Siege',
-                        value: '${stats['wins'] ?? 0}',
-                      ),
-                      _DeleteInfoLine(
-                        label: 'Niederlagen',
-                        value: '${stats['losses'] ?? 0}',
-                      ),
-                      _DeleteInfoLine(
-                        label: 'Legs gewonnen',
-                        value: '${stats['legs_won'] ?? 0}',
-                      ),
-                      _DeleteInfoLine(
-                        label: 'Sets gewonnen',
-                        value: '${stats['sets_won'] ?? 0}',
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Dieser Schritt kann nicht rückgängig gemacht werden.',
-                        style: TextStyle(
-                          color: Color(0xFFFF5C77),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 22),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _DialogButton(
-                        label: 'Abbrechen',
-                        isPrimary: false,
-                        onPressed: () {
-                          Navigator.of(dialogContext).pop();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _DialogButton(
-                        label: 'Profil löschen',
-                        isPrimary: false,
-                        isDanger: true,
-                        onPressed: () async {
-                          Navigator.of(dialogContext).pop();
-                          await _deletePlayer(player);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  InputDecoration _inputDecoration({
-    required String label,
-    required String hint,
-  }) {
-    return InputDecoration(
-      labelText: label,
-      hintText: hint,
-      labelStyle: const TextStyle(
-        color: Color(0xFF9DA8B7),
-        fontWeight: FontWeight.w700,
-      ),
-      hintStyle: const TextStyle(
-        color: Color(0xFF566172),
-      ),
-      filled: true,
-      fillColor: const Color(0xFF141A22),
-      prefixIcon: Icon(
-        Icons.person_rounded,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: const BorderSide(
-          color: Color(0xFF2A3545),
-        ),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.primary,
-          width: 1.5,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _createProfileFromDialog({
-    required BuildContext dialogContext,
-    required String name,
-  }) async {
-    final String cleanedName = name.trim();
-
-    if (cleanedName.isEmpty) {
+  Future<void> _createPlayer(String name, BuildContext dialogContext) async {
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) {
       _showMessage('Bitte gib einen Spielernamen ein.');
       return;
     }
 
-    final bool nameAlreadyExists =
-        await AppDatabase.instance.playerNameExists(cleanedName);
+    final exists = await AppDatabase.instance.playerNameExists(cleanName);
+    if (!mounted) return;
 
-    if (!mounted) {
-      return;
-    }
-
-    if (nameAlreadyExists) {
+    if (exists) {
       _showMessage('Ein Spieler mit diesem Namen existiert bereits.');
       return;
     }
 
-    final Player newPlayer = Player(
+    final player = Player(
       id: 'profile_${DateTime.now().millisecondsSinceEpoch}',
-      name: cleanedName,
+      name: cleanName,
     );
 
-    await AppDatabase.instance.insertPlayer(newPlayer);
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      selectedPlayer = newPlayer;
-    });
-
+    await AppDatabase.instance.insertPlayer(player);
+    selectedPlayer = player;
     await _loadPlayersAndStats();
 
-    if (!mounted || !dialogContext.mounted) {
-      return;
-    }
-
+    if (!mounted || !dialogContext.mounted) return;
     Navigator.of(dialogContext).pop();
-    _showMessage('Profil "$cleanedName" wurde gespeichert.');
+    _showMessage('Profil "$cleanName" wurde gespeichert.');
   }
 
-  Future<void> _updateProfileFromDialog({
-    required BuildContext dialogContext,
-    required Player player,
-    required String newName,
-  }) async {
-    final String cleanedName = newName.trim();
-
-    if (cleanedName.isEmpty) {
+  Future<void> _renamePlayer(
+    Player player,
+    String newName,
+    BuildContext dialogContext,
+  ) async {
+    final cleanName = newName.trim();
+    if (cleanName.isEmpty) {
       _showMessage('Bitte gib einen Spielernamen ein.');
       return;
     }
 
-    if (cleanedName == player.name) {
-      if (dialogContext.mounted) {
-        Navigator.of(dialogContext).pop();
-      }
-
+    if (cleanName == player.name) {
+      Navigator.of(dialogContext).pop();
       return;
     }
 
-    final bool nameAlreadyExists =
-        await AppDatabase.instance.playerNameExistsForOtherPlayer(
-      name: cleanedName,
+    final exists = await AppDatabase.instance.playerNameExistsForOtherPlayer(
+      name: cleanName,
       currentPlayerId: player.id,
     );
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
-    if (nameAlreadyExists) {
+    if (exists) {
       _showMessage('Ein anderer Spieler nutzt diesen Namen bereits.');
       return;
     }
 
     await AppDatabase.instance.updatePlayerName(
       playerId: player.id,
-      newName: cleanedName,
+      newName: cleanName,
     );
 
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      selectedPlayer = Player(
-        id: player.id,
-        name: cleanedName,
-      );
-    });
-
+    selectedPlayer = player.copyWith(name: cleanName);
     await _loadPlayersAndStats();
 
-    if (!mounted || !dialogContext.mounted) {
-      return;
-    }
-
+    if (!mounted || !dialogContext.mounted) return;
     Navigator.of(dialogContext).pop();
-    _showMessage('Profil wurde umbenannt in "$cleanedName".');
-  }
-
-  void _selectPlayer(Player player) {
-    setState(() {
-      selectedPlayer = player;
-    });
+    _showMessage('Profil wurde umbenannt in "$cleanName".');
   }
 
   Future<void> _deletePlayer(Player player) async {
+    await PlayerNameAudioService.instance.deleteStoredNameAudioForPlayer(player);
     await AppDatabase.instance.deletePlayer(player.id);
-
-    if (!mounted) {
-      return;
-    }
-
-    if (selectedPlayer?.id == player.id) {
-      selectedPlayer = null;
-    }
-
+    if (!mounted) return;
+    selectedPlayer = null;
     await _loadPlayersAndStats();
-
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     _showMessage('${player.name} wurde gelöscht.');
+  }
+
+  Future<void> _loadNameAudio(Player player) async {
+    if (audioActionRunning) return;
+    setState(() => audioActionRunning = true);
+
+    try {
+      final storedPath =
+          await PlayerNameAudioService.instance.pickAndStoreNameAudioForPlayer(player);
+      if (storedPath == null) return;
+
+      await AppDatabase.instance.updatePlayerCustomNameAudioPath(
+        playerId: player.id,
+        customNameAudioPath: storedPath,
+      );
+
+      selectedPlayer = player.copyWith(customNameAudioPath: storedPath);
+      await _loadPlayersAndStats();
+      if (!mounted) return;
+      _showMessage('Name-Ansage für ${player.name} wurde gespeichert.');
+    } catch (_) {
+      if (mounted) _showMessage('Name-Ansage konnte nicht geladen werden.');
+    } finally {
+      if (mounted) setState(() => audioActionRunning = false);
+    }
+  }
+
+  Future<void> _testNameAudio(Player player) async {
+    final played = await PlayerNameAudioService.instance.playNameAudioForPlayer(
+      player,
+      waitForCompletion: true,
+    );
+    if (!played) _showMessage('Keine gültige Name-Ansage gefunden.');
+  }
+
+  Future<void> _removeNameAudio(Player player) async {
+    if (audioActionRunning) return;
+    setState(() => audioActionRunning = true);
+    try {
+      await PlayerNameAudioService.instance.deleteStoredNameAudioForPlayer(player);
+      await AppDatabase.instance.updatePlayerCustomNameAudioPath(
+        playerId: player.id,
+        customNameAudioPath: null,
+      );
+      selectedPlayer = player.copyWith(clearCustomNameAudioPath: true);
+      await _loadPlayersAndStats();
+      if (!mounted) return;
+      _showMessage('Name-Ansage für ${player.name} wurde entfernt.');
+    } finally {
+      if (mounted) setState(() => audioActionRunning = false);
+    }
   }
 
   Map<String, int> _statsForPlayer(Player player) {
@@ -700,47 +214,31 @@ class _ProfilesPageState extends State<ProfilesPage> {
   Map<String, num> _dartStatsForPlayer(Player player) {
     return playerDartStatsById[player.id] ??
         {
-          'turn_count': 0,
-          'total_score': 0,
-          'total_darts': 0,
           'average': 0,
           'form_average': 0,
-          'form_score': 0,
           'form_darts': 0,
-          'highest_score': 0,
           'score_180_count': 0,
           'score_140_plus_count': 0,
           'score_100_plus_count': 0,
         };
   }
 
-  Map<String, num> _advancedX01StatsForPlayer(Player player) {
+  Map<String, num> _advancedStatsForPlayer(Player player) {
     return playerAdvancedX01StatsById[player.id] ??
         {
-          'highest_finish': 0,
-          'first_9_average': 0,
-          'first_9_score': 0,
-          'first_9_darts': 0,
-          'best_leg_darts': 0,
           'best_leg_301_darts': 0,
           'best_leg_501_darts': 0,
           'best_leg_rtc_darts': 0,
-          'checkout_attempts': 0,
-          'checkout_successes': 0,
           'checkout_percentage': 0,
-          'double_attempts': 0,
-          'double_hits': 0,
           'double_percentage': 0,
+          'highest_finish': 0,
           'bust_count': 0,
           'classic_count': 0,
         };
   }
 
   void _showMessage(String text) {
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(text),
@@ -750,10 +248,63 @@ class _ProfilesPageState extends State<ProfilesPage> {
     );
   }
 
+  void _openCreateProfileDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _NameDialog(
+        title: 'Profil anlegen',
+        subtitle: 'Erstelle einen neuen Spieler',
+        icon: Icons.person_add_alt_1_rounded,
+        controller: controller,
+        primaryLabel: 'Profil speichern',
+        onSubmit: () => _createPlayer(controller.text, dialogContext),
+      ),
+    );
+  }
+
+  void _openEditProfileDialog(Player player) {
+    final controller = TextEditingController(text: player.name);
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _NameDialog(
+        title: 'Profil bearbeiten',
+        subtitle: 'Spielernamen ändern',
+        icon: Icons.edit_rounded,
+        controller: controller,
+        primaryLabel: 'Änderung speichern',
+        onSubmit: () => _renamePlayer(player, controller.text, dialogContext),
+      ),
+    );
+  }
+
+  void _openDeleteProfileDialog(Player player) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF101720),
+        title: const Text('Profil wirklich löschen?'),
+        content: Text('${player.name} und alle zugehörigen Daten werden gelöscht.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Abbrechen'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await _deletePlayer(player);
+            },
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final Player? player = selectedPlayer;
-    final Color accentColor = Theme.of(context).colorScheme.primary;
+    final accentColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       body: Container(
@@ -773,20 +324,14 @@ class _ProfilesPageState extends State<ProfilesPage> {
             padding: const EdgeInsets.symmetric(horizontal: 42, vertical: 34),
             child: Column(
               children: [
-                _buildHeader(context),
+                _buildHeader(),
                 const SizedBox(height: 34),
                 Expanded(
                   child: Row(
                     children: [
-                      Expanded(
-                        flex: 9,
-                        child: _buildProfilePanel(),
-                      ),
+                      Expanded(flex: 9, child: _buildProfilePanel()),
                       const SizedBox(width: 24),
-                      Expanded(
-                        flex: 11,
-                        child: _buildStatsPanel(player),
-                      ),
+                      Expanded(flex: 11, child: _buildStatsPanel()),
                     ],
                   ),
                 ),
@@ -807,19 +352,16 @@ class _ProfilesPageState extends State<ProfilesPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    final Color accentColor = Theme.of(context).colorScheme.primary;
+  Widget _buildHeader() {
+    final accentColor = Theme.of(context).colorScheme.primary;
 
     return Row(
       children: [
         IconButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back_rounded),
           color: Colors.white,
           iconSize: 32,
-          tooltip: 'Zurück',
         ),
         const SizedBox(width: 14),
         Container(
@@ -828,15 +370,9 @@ class _ProfilesPageState extends State<ProfilesPage> {
           decoration: BoxDecoration(
             color: accentColor.withValues(alpha: 0.13),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: accentColor.withValues(alpha: 0.25),
-            ),
+            border: Border.all(color: accentColor.withValues(alpha: 0.25)),
           ),
-          child: Icon(
-            Icons.groups_rounded,
-            color: accentColor,
-            size: 34,
-          ),
+          child: Icon(Icons.groups_rounded, color: accentColor, size: 34),
         ),
         const SizedBox(width: 18),
         const Column(
@@ -844,15 +380,11 @@ class _ProfilesPageState extends State<ProfilesPage> {
           children: [
             Text(
               'Profiles',
-              style: TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.2,
-              ),
+              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900),
             ),
             SizedBox(height: 4),
             Text(
-              'Spieler verwalten, Statistiken speichern und Fortschritt sehen',
+              'Spieler verwalten, Namensansagen speichern und Fortschritt sehen',
               style: TextStyle(
                 fontSize: 15,
                 color: Color(0xFF9DA8B7),
@@ -886,249 +418,126 @@ class _ProfilesPageState extends State<ProfilesPage> {
                     ),
                   )
                 : players.isEmpty
-                    ? _buildEmptyPlayersList()
-                    : _buildPlayersList(),
+                    ? const Center(child: Text('Noch keine Profile'))
+                    : ListView.separated(
+                        itemCount: players.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final player = players[index];
+                          final stats = _statsForPlayer(player);
+                          final selected = selectedPlayer?.id == player.id;
+                          final hasAudio = PlayerNameAudioService.instance
+                              .hasUsableNameAudio(player);
+
+                          return _PlayerProfileCard(
+                            player: player,
+                            selected: selected,
+                            gamesPlayed: stats['games_played'] ?? 0,
+                            wins: stats['wins'] ?? 0,
+                            hasAudio: hasAudio,
+                            onTap: () => setState(() => selectedPlayer = player),
+                            onDelete: () => _openDeleteProfileDialog(player),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyPlayersList() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141A22),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF2A3545),
-        ),
-      ),
-      child: const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.person_off_rounded,
-            color: Color(0xFF566172),
-            size: 62,
-          ),
-          SizedBox(height: 18),
-          Text(
-            'Noch keine Profile',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Klicke auf „Profil anlegen“, um den ersten Spieler zu speichern.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF9DA8B7),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlayersList() {
-    return ListView.separated(
-      itemCount: players.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final Player player = players[index];
-        final bool isSelected = selectedPlayer?.id == player.id;
-        final Map<String, int> stats = _statsForPlayer(player);
-
-        return _PlayerProfileCard(
-          player: player,
-          isSelected: isSelected,
-          gamesPlayed: stats['games_played'] ?? 0,
-          wins: stats['wins'] ?? 0,
-          onTap: () {
-            _selectPlayer(player);
-          },
-          onDelete: () {
-            _openDeleteProfileDialog(player);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildStatsPanel(Player? player) {
+  Widget _buildStatsPanel() {
+    final player = selectedPlayer;
     return _Panel(
       title: player == null ? 'Statistiken' : player.name,
       subtitle: player == null ? 'Kein Spieler ausgewählt' : 'Live-Profilwerte',
       child: player == null
-          ? _buildNoPlayerSelected()
-          : _buildPlayerStatsPreview(player),
+          ? const Center(child: Text('Lege ein Profil an oder wähle links einen Spieler aus.'))
+          : _buildPlayerStats(player),
     );
   }
 
-  Widget _buildNoPlayerSelected() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(26),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141A22),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFF2A3545),
-        ),
-      ),
-      child: const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.bar_chart_rounded,
-            color: Color(0xFF566172),
-            size: 70,
-          ),
-          SizedBox(height: 18),
-          Text(
-            'Kein Spieler ausgewählt',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Lege ein Profil an oder wähle links einen Spieler aus.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF9DA8B7),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlayerStatsPreview(Player player) {
-    final Map<String, int> stats = _statsForPlayer(player);
-
-    final int wins = stats['wins'] ?? 0;
-    final int legsWon = stats['legs_won'] ?? 0;
-
-    final Map<String, num> dartStats = _dartStatsForPlayer(player);
-    final double average = (dartStats['average'] ?? 0).toDouble();
-    final double formAverage = (dartStats['form_average'] ?? 0).toDouble();
-    final int formDarts = (dartStats['form_darts'] ?? 0).toInt();
-    final int score180Count = (dartStats['score_180_count'] ?? 0).toInt();
-    final int score140PlusCount =
-        (dartStats['score_140_plus_count'] ?? 0).toInt();
-    final int score100PlusCount =
-        (dartStats['score_100_plus_count'] ?? 0).toInt();
-
-    final Map<String, num> advancedX01Stats =
-        _advancedX01StatsForPlayer(player);
-    final int bestLeg301Darts =
-        (advancedX01Stats['best_leg_301_darts'] ?? 0).toInt();
-    final int bestLeg501Darts =
-        (advancedX01Stats['best_leg_501_darts'] ?? 0).toInt();
-    final int bestLegRtcDarts =
-        (advancedX01Stats['best_leg_rtc_darts'] ?? 0).toInt();
-    final double checkoutPercentage =
-        (advancedX01Stats['checkout_percentage'] ?? 0).toDouble();
-    final double doublePercentage =
-        (advancedX01Stats['double_percentage'] ?? 0).toDouble();
-    final int highestFinish =
-        (advancedX01Stats['highest_finish'] ?? 0).toInt();
-    final int bustCount = (advancedX01Stats['bust_count'] ?? 0).toInt();
-    final int classicCount = (advancedX01Stats['classic_count'] ?? 0).toInt();
+  Widget _buildPlayerStats(Player player) {
+    final stats = _statsForPlayer(player);
+    final dartStats = _dartStatsForPlayer(player);
+    final advanced = _advancedStatsForPlayer(player);
+    final hasAudio = PlayerNameAudioService.instance.hasUsableNameAudio(player);
+    final audioPath = player.customNameAudioPath;
+    final audioLabel = audioPath == null || audioPath.trim().isEmpty
+        ? 'Keine Name-Ansage geladen'
+        : path.basename(audioPath);
 
     return Column(
       children: [
         Container(
-          height: 104,
-          padding: const EdgeInsets.symmetric(horizontal: 22),
+          height: 150,
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFF141A22),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: const Color(0xFF2A3545),
-            ),
+            border: Border.all(color: const Color(0xFF2A3545)),
           ),
           child: Row(
             children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.13),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(
-                  Icons.person_rounded,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 34,
-                ),
+              Icon(
+                hasAudio ? Icons.record_voice_over_rounded : Icons.person_rounded,
+                color: Theme.of(context).colorScheme.primary,
+                size: 42,
               ),
               const SizedBox(width: 18),
               Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       player.name,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w900),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
-                      formDarts > 0
-                          ? 'Profilstatistiken · Form aus letzten $formDarts Darts'
-                          : 'Profilstatistiken',
+                      audioLabel,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Color(0xFF9DA8B7),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
               ),
-              SizedBox(
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    _openEditProfileDialog(player);
-                  },
-                  icon: const Icon(Icons.edit_rounded),
-                  label: const Text('Bearbeiten'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF101720),
-                    foregroundColor: const Color(0xFFEAF1F8),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      side: const BorderSide(
-                        color: Color(0xFF2A3545),
-                      ),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                    ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _MiniButton(
+                    label: 'Bearbeiten',
+                    icon: Icons.edit_rounded,
+                    onPressed: () => _openEditProfileDialog(player),
                   ),
-                ),
+                  _MiniButton(
+                    label: 'Name laden',
+                    icon: Icons.upload_file_rounded,
+                    onPressed: audioActionRunning ? null : () => _loadNameAudio(player),
+                  ),
+                  _MiniButton(
+                    label: 'Testen',
+                    icon: Icons.play_arrow_rounded,
+                    onPressed: hasAudio && !audioActionRunning
+                        ? () => _testNameAudio(player)
+                        : null,
+                  ),
+                  _MiniButton(
+                    label: 'Entfernen',
+                    icon: Icons.delete_outline_rounded,
+                    danger: true,
+                    onPressed: hasAudio && !audioActionRunning
+                        ? () => _removeNameAudio(player)
+                        : null,
+                  ),
+                ],
               ),
             ],
           ),
@@ -1141,70 +550,115 @@ class _ProfilesPageState extends State<ProfilesPage> {
             crossAxisSpacing: 14,
             childAspectRatio: 2.6,
             children: [
-              _StatPreviewCard(
-                label: 'Gesamt Ø',
-                value: _averageValue(average),
-              ),
-              _StatPreviewCard(
-                label: 'Form Ø',
-                value: _averageValue(formAverage),
-              ),
-              _StatPreviewCard(
-                label: 'Best Leg 301',
-                value: _bestLegValue(bestLeg301Darts),
-              ),
-              _StatPreviewCard(
-                label: 'Best Leg 501',
-                value: _bestLegValue(bestLeg501Darts),
-              ),
-              _StatPreviewCard(
-                label: 'Best Leg RTC',
-                value: _bestLegValue(bestLegRtcDarts),
-              ),
-              _StatPreviewCard(
-                label: 'Checkout %',
-                value: '${checkoutPercentage.toStringAsFixed(1)}%',
-              ),
-              _StatPreviewCard(
-                label: 'Doppel %',
-                value: '${doublePercentage.toStringAsFixed(1)}%',
-              ),
-              _StatPreviewCard(
-                label: 'High Checkout',
-                value: highestFinish <= 0 ? '-' : '$highestFinish',
-              ),
-              _StatPreviewCard(
-                label: 'Busts',
-                value: '$bustCount',
-              ),
-              _StatPreviewCard(
-                label: 'Classics',
-                value: '$classicCount',
-              ),
-              _StatPreviewCard(
-                label: 'Matches won',
-                value: '$wins',
-              ),
-              _StatPreviewCard(
-                label: 'Legs won',
-                value: '$legsWon',
-              ),
-              _StatPreviewCard(
-                label: '180s',
-                value: '$score180Count',
-              ),
-              _StatPreviewCard(
-                label: '100+',
-                value: '$score100PlusCount',
-              ),
-              _StatPreviewCard(
-                label: '140+',
-                value: '$score140PlusCount',
-              ),
+              _StatPreviewCard(label: 'Gesamt Ø', value: _averageValue((dartStats['average'] ?? 0).toDouble())),
+              _StatPreviewCard(label: 'Form Ø', value: _averageValue((dartStats['form_average'] ?? 0).toDouble())),
+              _StatPreviewCard(label: 'Best Leg 301', value: _bestLegValue((advanced['best_leg_301_darts'] ?? 0).toInt())),
+              _StatPreviewCard(label: 'Best Leg 501', value: _bestLegValue((advanced['best_leg_501_darts'] ?? 0).toInt())),
+              _StatPreviewCard(label: 'Best Leg RTC', value: _bestLegValue((advanced['best_leg_rtc_darts'] ?? 0).toInt())),
+              _StatPreviewCard(label: 'Checkout %', value: '${(advanced['checkout_percentage'] ?? 0).toDouble().toStringAsFixed(1)}%'),
+              _StatPreviewCard(label: 'Doppel %', value: '${(advanced['double_percentage'] ?? 0).toDouble().toStringAsFixed(1)}%'),
+              _StatPreviewCard(label: 'High Checkout', value: ((advanced['highest_finish'] ?? 0).toInt()) <= 0 ? '-' : '${(advanced['highest_finish'] ?? 0).toInt()}'),
+              _StatPreviewCard(label: 'Busts', value: '${(advanced['bust_count'] ?? 0).toInt()}'),
+              _StatPreviewCard(label: 'Classics', value: '${(advanced['classic_count'] ?? 0).toInt()}'),
+              _StatPreviewCard(label: 'Matches won', value: '${stats['wins'] ?? 0}'),
+              _StatPreviewCard(label: 'Legs won', value: '${stats['legs_won'] ?? 0}'),
+              _StatPreviewCard(label: '180s', value: '${(dartStats['score_180_count'] ?? 0).toInt()}'),
+              _StatPreviewCard(label: '100+', value: '${(dartStats['score_100_plus_count'] ?? 0).toInt()}'),
+              _StatPreviewCard(label: '140+', value: '${(dartStats['score_140_plus_count'] ?? 0).toInt()}'),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _NameDialog extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final TextEditingController controller;
+  final String primaryLabel;
+  final Future<void> Function() onSubmit;
+
+  const _NameDialog({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.controller,
+    required this.primaryLabel,
+    required this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: 620,
+        padding: const EdgeInsets.all(26),
+        decoration: BoxDecoration(
+          color: const Color(0xFF101720),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: const Color(0xFF243040)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: accent, size: 34),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+                      Text(subtitle, style: const TextStyle(color: Color(0xFF9DA8B7))),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              decoration: InputDecoration(
+                labelText: 'Spielername',
+                filled: true,
+                fillColor: const Color(0xFF141A22),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              onSubmitted: (_) => onSubmit(),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Abbrechen'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: onSubmit,
+                    child: Text(primaryLabel),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1214,11 +668,7 @@ class _Panel extends StatelessWidget {
   final String subtitle;
   final Widget child;
 
-  const _Panel({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
+  const _Panel({required this.title, required this.subtitle, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -1227,143 +677,21 @@ class _Panel extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF101720),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: const Color(0xFF243040),
-          width: 1.2,
-        ),
+        border: Border.all(color: const Color(0xFF243040), width: 1.2),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(
-                Icons.radio_button_checked,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+              Icon(Icons.radio_button_checked, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 10),
-              Text(
-                title,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 23,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+              Text(title, style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w900)),
               const Spacer(),
-              Flexible(
-                child: Text(
-                  subtitle,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    color: Color(0xFF9DA8B7),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+              Text(subtitle, style: const TextStyle(color: Color(0xFF9DA8B7), fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 22),
           Expanded(child: child),
-        ],
-      ),
-    );
-  }
-}
-
-class _DialogButton extends StatelessWidget {
-  final String label;
-  final bool isPrimary;
-  final bool isDanger;
-  final VoidCallback onPressed;
-
-  const _DialogButton({
-    required this.label,
-    required this.isPrimary,
-    required this.onPressed,
-    this.isDanger = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Color backgroundColor;
-    Color foregroundColor;
-    Color borderColor;
-
-    if (isDanger) {
-      backgroundColor = const Color(0xFFFF5C77);
-      foregroundColor = Colors.white;
-      borderColor = const Color(0xFFFF5C77);
-    } else if (isPrimary) {
-      backgroundColor = Theme.of(context).colorScheme.primary;
-      foregroundColor = const Color(0xFF06100B);
-      borderColor = Theme.of(context).colorScheme.primary;
-    } else {
-      backgroundColor = const Color(0xFF141A22);
-      foregroundColor = const Color(0xFFEAF1F8);
-      borderColor = const Color(0xFF2A3545);
-    }
-
-    return SizedBox(
-      height: 62,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: foregroundColor,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: borderColor),
-          ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DeleteInfoLine extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _DeleteInfoLine({
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 7),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF9DA8B7),
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFFEAF1F8),
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
         ],
       ),
     );
@@ -1376,17 +704,11 @@ class _BigActionButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _BigActionButton({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-  });
+  const _BigActionButton({required this.title, required this.subtitle, required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final Color accentColor = Theme.of(context).colorScheme.primary;
-
+    final accent = Theme.of(context).colorScheme.primary;
     return SizedBox(
       height: 116,
       width: double.infinity,
@@ -1396,62 +718,27 @@ class _BigActionButton extends StatelessWidget {
           backgroundColor: const Color(0xFF141A22),
           foregroundColor: Colors.white,
           elevation: 0,
-          padding: const EdgeInsets.all(20),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(
-              color: Color(0xFF243040),
-              width: 1.2,
-            ),
+            side: const BorderSide(color: Color(0xFF243040)),
           ),
         ),
         child: Row(
           children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.13),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(
-                icon,
-                color: accentColor,
-                size: 31,
-              ),
-            ),
+            Icon(icon, color: accent, size: 34),
             const SizedBox(width: 18),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+                  Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF9DA8B7),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  Text(subtitle, style: const TextStyle(color: Color(0xFF9DA8B7), fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF9DA8B7),
-              size: 32,
-            ),
+            const Icon(Icons.chevron_right_rounded),
           ],
         ),
       ),
@@ -1461,29 +748,28 @@ class _BigActionButton extends StatelessWidget {
 
 class _PlayerProfileCard extends StatelessWidget {
   final Player player;
-  final bool isSelected;
+  final bool selected;
   final int gamesPlayed;
   final int wins;
+  final bool hasAudio;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _PlayerProfileCard({
     required this.player,
-    required this.isSelected,
+    required this.selected,
     required this.gamesPlayed,
     required this.wins,
+    required this.hasAudio,
     required this.onTap,
     required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    final Color accentColor = Theme.of(context).colorScheme.primary;
-
+    final accent = Theme.of(context).colorScheme.primary;
     return Material(
-      color: isSelected
-          ? accentColor.withValues(alpha: 0.12)
-          : const Color(0xFF141A22),
+      color: selected ? accent.withValues(alpha: 0.12) : const Color(0xFF141A22),
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
         onTap: onTap,
@@ -1493,60 +779,61 @@ class _PlayerProfileCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: isSelected ? accentColor : const Color(0xFF2A3545),
-              width: isSelected ? 1.6 : 1.1,
-            ),
+            border: Border.all(color: selected ? accent : const Color(0xFF2A3545)),
           ),
           child: Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: isSelected ? accentColor : const Color(0xFF101720),
-                  borderRadius: BorderRadius.circular(17),
-                ),
-                child: Icon(
-                  Icons.person_rounded,
-                  color: isSelected ? const Color(0xFF06100B) : accentColor,
-                  size: 31,
-                ),
-              ),
+              Icon(hasAudio ? Icons.record_voice_over_rounded : Icons.person_rounded, color: accent, size: 34),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      player.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                    Text(player.name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 6),
                     Text(
-                      '$gamesPlayed Spiele · $wins Siege',
+                      hasAudio ? '$gamesPlayed Spiele · $wins Siege · Name-Audio' : '$gamesPlayed Spiele · $wins Siege',
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF9DA8B7),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: const TextStyle(color: Color(0xFF9DA8B7), fontSize: 13, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                color: const Color(0xFFFF5C77),
-                tooltip: 'Profil löschen',
-              ),
+              IconButton(onPressed: onDelete, icon: const Icon(Icons.delete_outline_rounded), color: const Color(0xFFFF5C77)),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool danger;
+
+  const _MiniButton({required this.label, required this.icon, required this.onPressed, this.danger = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 38,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF101720),
+          foregroundColor: danger ? const Color(0xFFFF5C77) : const Color(0xFFEAF1F8),
+          disabledBackgroundColor: const Color(0xFF101720),
+          disabledForegroundColor: const Color(0xFF566172),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: danger ? const Color(0xFF3A2430) : const Color(0xFF2A3545)),
           ),
         ),
       ),
@@ -1558,48 +845,23 @@ class _StatPreviewCard extends StatelessWidget {
   final String label;
   final String value;
 
-  const _StatPreviewCard({
-    required this.label,
-    required this.value,
-  });
+  const _StatPreviewCard({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    final bool isPlaceholder = value == '-' || value == 'später';
-
+    final placeholder = value == '-';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFF141A22),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFF2A3545),
-        ),
+        border: Border.all(color: const Color(0xFF2A3545)),
       ),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF9DA8B7),
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
+          Expanded(child: Text(label, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF9DA8B7), fontWeight: FontWeight.w700))),
           const SizedBox(width: 12),
-          Text(
-            value,
-            style: TextStyle(
-              color: isPlaceholder
-                  ? const Color(0xFF6F7A89)
-                  : Theme.of(context).colorScheme.primary,
-              fontSize: isPlaceholder ? 20 : 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          Text(value, style: TextStyle(color: placeholder ? const Color(0xFF6F7A89) : Theme.of(context).colorScheme.primary, fontSize: placeholder ? 20 : 24, fontWeight: FontWeight.w900)),
         ],
       ),
     );
@@ -1607,17 +869,11 @@ class _StatPreviewCard extends StatelessWidget {
 }
 
 String _averageValue(double value) {
-  if (value <= 0 || value.isNaN || value.isInfinite) {
-    return '-';
-  }
-
+  if (value <= 0 || value.isNaN || value.isInfinite) return '-';
   return value.toStringAsFixed(2);
 }
 
 String _bestLegValue(int darts) {
-  if (darts <= 0) {
-    return '-';
-  }
-
+  if (darts <= 0) return '-';
   return '$darts Darts';
 }

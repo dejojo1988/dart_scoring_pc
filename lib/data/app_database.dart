@@ -59,8 +59,7 @@ class AppDatabase {
 
   Future<List<DatabaseBackupInfo>> getDatabaseBackups() async {
     final Directory backupDirectory = await getBackupDirectory();
-    final List<FileSystemEntity> entries =
-        await backupDirectory.list().toList();
+    final List<FileSystemEntity> entries = await backupDirectory.list().toList();
 
     final List<DatabaseBackupInfo> backups = [];
 
@@ -85,8 +84,7 @@ class AppDatabase {
     return backups;
   }
 
-  Future<File> exportDatabaseBackup(
-      {required String targetDirectoryPath}) async {
+  Future<File> exportDatabaseBackup({required String targetDirectoryPath}) async {
     final Database db = await database;
     await _checkpointDatabaseIfPossible(db);
 
@@ -116,8 +114,7 @@ class AppDatabase {
     return databaseFile.copy(exportPath);
   }
 
-  Future<void> restoreDatabaseFromBackup(
-      {required String backupFilePath}) async {
+  Future<void> restoreDatabaseFromBackup({required String backupFilePath}) async {
     final File backupFile = File(backupFilePath);
 
     if (!await backupFile.exists()) {
@@ -173,7 +170,7 @@ class AppDatabase {
     return databaseFactory.openDatabase(
       fullPath,
       options: OpenDatabaseOptions(
-        version: 5,
+        version: 6,
         onConfigure: (Database database) async {
           await database.execute('PRAGMA foreign_keys = ON');
         },
@@ -184,7 +181,8 @@ class AppDatabase {
   }
 
   Future<Directory> _getDatabaseDirectory() async {
-    final String basePath = Platform.environment['APPDATA'] ??
+    final String basePath =
+        Platform.environment['APPDATA'] ??
         Platform.environment['LOCALAPPDATA'] ??
         Directory.current.path;
 
@@ -321,8 +319,7 @@ class AppDatabase {
 
   Future<void> _cleanupOldBackups(Directory backupDirectory) async {
     try {
-      final List<FileSystemEntity> entries =
-          await backupDirectory.list().toList();
+      final List<FileSystemEntity> entries = await backupDirectory.list().toList();
 
       final List<File> backups = entries.whereType<File>().where((file) {
         return path.basename(file.path).toLowerCase().endsWith('.db');
@@ -382,6 +379,10 @@ class AppDatabase {
     if (oldVersion < 5) {
       await _createTrainingTables(database);
     }
+
+    if (oldVersion < 6) {
+      await _addPlayerCustomNameAudioPathColumn(database);
+    }
   }
 
   Future<void> _createPlayersTable(Database database) async {
@@ -389,8 +390,27 @@ class AppDatabase {
       CREATE TABLE IF NOT EXISTS players (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        custom_name_audio_path TEXT,
         created_at TEXT NOT NULL
       )
+    ''');
+  }
+
+  Future<void> _addPlayerCustomNameAudioPathColumn(Database database) async {
+    final List<Map<String, Object?>> columns =
+        await database.rawQuery('PRAGMA table_info(players)');
+
+    final bool columnExists = columns.any((column) {
+      return column['name'] == 'custom_name_audio_path';
+    });
+
+    if (columnExists) {
+      return;
+    }
+
+    await database.execute('''
+      ALTER TABLE players
+      ADD COLUMN custom_name_audio_path TEXT
     ''');
   }
 
@@ -584,9 +604,16 @@ class AppDatabase {
     );
 
     return rows.map((row) {
+      final String? customNameAudioPath =
+          (row['custom_name_audio_path'] as String?)?.trim();
+
       return Player(
         id: row['id'] as String,
         name: row['name'] as String,
+        customNameAudioPath:
+            customNameAudioPath == null || customNameAudioPath.isEmpty
+                ? null
+                : customNameAudioPath,
       );
     }).toList();
   }
@@ -600,6 +627,7 @@ class AppDatabase {
         {
           'id': player.id,
           'name': player.name,
+          'custom_name_audio_path': player.customNameAudioPath,
           'created_at': DateTime.now().toIso8601String(),
         },
         conflictAlgorithm: ConflictAlgorithm.abort,
@@ -631,6 +659,25 @@ class AppDatabase {
       'players',
       {
         'name': newName,
+      },
+      where: 'id = ?',
+      whereArgs: [playerId],
+    );
+  }
+
+  Future<void> updatePlayerCustomNameAudioPath({
+    required String playerId,
+    required String? customNameAudioPath,
+  }) async {
+    final Database db = await database;
+
+    final String? cleanPath = customNameAudioPath?.trim();
+
+    await db.update(
+      'players',
+      {
+        'custom_name_audio_path':
+            cleanPath == null || cleanPath.isEmpty ? null : cleanPath,
       },
       where: 'id = ?',
       whereArgs: [playerId],
@@ -843,8 +890,7 @@ class AppDatabase {
       final String playerId = row['player_id'] as String;
       final int totalScore = (row['total_score'] as num).toInt();
       final int totalDarts = (row['total_darts'] as num).toInt();
-      final double average =
-          totalDarts == 0 ? 0 : (totalScore / totalDarts) * 3;
+      final double average = totalDarts == 0 ? 0 : (totalScore / totalDarts) * 3;
       final Map<String, num> formStats =
           formStatsByPlayerId[playerId] ?? _emptyFormDartStats();
 
@@ -901,7 +947,8 @@ class AppDatabase {
       formDarts += (row['dart_count'] as num).toInt();
     }
 
-    final double formAverage = formDarts == 0 ? 0 : (formScore / formDarts) * 3;
+    final double formAverage =
+        formDarts == 0 ? 0 : (formScore / formDarts) * 3;
 
     return {
       'form_average': formAverage,
@@ -1054,9 +1101,7 @@ class AppDatabase {
 
       final String bustTurnKey = '$playerId|$matchId|$legNumber|$turnNumber';
 
-      classicLabelsByTurn
-          .putIfAbsent(bustTurnKey, () => <String>[])
-          .add(dartLabel);
+      classicLabelsByTurn.putIfAbsent(bustTurnKey, () => <String>[]).add(dartLabel);
       classicPlayerByTurn[bustTurnKey] = playerId;
 
       if (isBust == 1) {
@@ -1158,8 +1203,7 @@ class AppDatabase {
         continue;
       }
 
-      classicCountByPlayer[playerId] =
-          (classicCountByPlayer[playerId] ?? 0) + 1;
+      classicCountByPlayer[playerId] = (classicCountByPlayer[playerId] ?? 0) + 1;
     }
 
     final Set<String> playerIds = {
@@ -1400,6 +1444,7 @@ class AppDatabase {
     });
   }
 
+
   Future<TrainingStatsSummary> getTrainingStatsSummary(String playerId) async {
     final Database db = await database;
 
@@ -1555,6 +1600,7 @@ class AppDatabase {
   }
 }
 
+
 class TrainingStatsSummary {
   final String playerId;
   final int sessionCount;
@@ -1626,8 +1672,9 @@ class TrainingStatsSummary {
       return TrainingStatsSummary.empty(playerId: playerId);
     }
 
-    final List<TrainingSessionListItem> sessions =
-        rows.map(TrainingSessionListItem.fromRow).toList(growable: false);
+    final List<TrainingSessionListItem> sessions = rows
+        .map(TrainingSessionListItem.fromRow)
+        .toList(growable: false);
 
     final Map<String, int> targetCounts = {};
     int totalDarts = 0;
@@ -1660,17 +1707,16 @@ class TrainingStatsSummary {
           (targetCounts[session.targetLabel] ?? 0) + 1;
     }
 
-    final List<MapEntry<String, int>> sortedTargets =
-        targetCounts.entries.toList()
-          ..sort((a, b) {
-            final int countCompare = b.value.compareTo(a.value);
+    final List<MapEntry<String, int>> sortedTargets = targetCounts.entries.toList()
+      ..sort((a, b) {
+        final int countCompare = b.value.compareTo(a.value);
 
-            if (countCompare != 0) {
-              return countCompare;
-            }
+        if (countCompare != 0) {
+          return countCompare;
+        }
 
-            return a.key.compareTo(b.key);
-          });
+        return a.key.compareTo(b.key);
+      });
 
     final TrainingSessionListItem lastSession = sessions.first;
     final int sessionCount = sessions.length;
@@ -1686,8 +1732,7 @@ class TrainingStatsSummary {
       bestAccuracyScore: bestAccuracy,
       bestGroupingScore: bestGrouping,
       bestConsistencyScore: bestConsistency,
-      favoriteTargetLabel:
-          sortedTargets.isEmpty ? '-' : sortedTargets.first.key,
+      favoriteTargetLabel: sortedTargets.isEmpty ? '-' : sortedTargets.first.key,
       lastTargetLabel: lastSession.targetLabel,
       lastMainErrorDirection: lastSession.mainErrorDirection.isEmpty
           ? '-'
@@ -1791,6 +1836,7 @@ class TrainingSessionListItem {
     return DateTime.tryParse(text);
   }
 }
+
 
 class TrainingSessionDetail {
   final String id;
@@ -1896,12 +1942,9 @@ class TrainingSessionDetail {
   double get segmentRate => _doubleFromMetadata('segment_rate');
   double get ringRate => _doubleFromMetadata('ring_rate');
   double get averageDistance => _doubleFromMetadata('average_distance');
-  double get averageGroupingDistance =>
-      _doubleFromMetadata('average_grouping_distance');
-  double get averageHorizontalError =>
-      _doubleFromMetadata('average_horizontal_error');
-  double get averageVerticalError =>
-      _doubleFromMetadata('average_vertical_error');
+  double get averageGroupingDistance => _doubleFromMetadata('average_grouping_distance');
+  double get averageHorizontalError => _doubleFromMetadata('average_horizontal_error');
+  double get averageVerticalError => _doubleFromMetadata('average_vertical_error');
 
   String _stringFromMetadata(String key) {
     return metadata[key]?.toString() ?? '';

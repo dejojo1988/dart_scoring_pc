@@ -9,6 +9,7 @@ import '../models/game_settings.dart';
 import '../models/player.dart';
 import '../services/audio_service.dart';
 import '../services/bot_opponent_service.dart';
+import '../services/player_name_audio_service.dart';
 import '../widgets/dart_input_grid.dart';
 import '../widgets/player_score_card.dart';
 
@@ -227,7 +228,8 @@ class _MatchPageState extends State<MatchPage> {
     currentTurnNumber = 1;
 
     remainingScores = {
-      for (final player in widget.players) player.id: widget.settings.startScore,
+      for (final player in widget.players)
+        player.id: widget.settings.startScore,
     };
 
     legsWon = {
@@ -342,6 +344,21 @@ class _MatchPageState extends State<MatchPage> {
     return 'Spieler $playerNumber';
   }
 
+  Future<bool> _playCustomPlayerNameIfAvailable(Player player) async {
+    if (_isBotPlayer(player)) {
+      return false;
+    }
+
+    try {
+      return PlayerNameAudioService.instance.playNameAudioForPlayer(
+        player,
+        waitForCompletion: true,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
   List<Player> _playersInAudioOrder() {
     if (widget.players.isEmpty) {
       return [];
@@ -390,10 +407,33 @@ class _MatchPageState extends State<MatchPage> {
       return;
     }
 
-    await AudioService.instance.announceGameStart(
-      startingPlayerName: _audioLabelForPlayer(activePlayer),
-      startScore: widget.settings.startScore,
-    );
+    final bool hasCustomStartName = !_isBotPlayer(activePlayer) &&
+        (activePlayer.customNameAudioPath?.trim().isNotEmpty ?? false);
+
+    if (hasCustomStartName) {
+      await AudioService.instance.playEvent(
+        AudioEventType.gameStart,
+        waitForCompletion: true,
+      );
+
+      final bool customStartNamePlayed =
+          await _playCustomPlayerNameIfAvailable(activePlayer);
+
+      if (customStartNamePlayed) {
+        await AudioService.instance.speak(
+          'startet mit ${widget.settings.startScore} Punkten.',
+        );
+      } else {
+        await AudioService.instance.speak(
+          '${activePlayer.name} startet mit ${widget.settings.startScore} Punkten.',
+        );
+      }
+    } else {
+      await AudioService.instance.announceGameStart(
+        startingPlayerName: _audioLabelForPlayer(activePlayer),
+        startScore: widget.settings.startScore,
+      );
+    }
 
     await Future<void>.delayed(const Duration(milliseconds: 700));
 
@@ -449,7 +489,8 @@ class _MatchPageState extends State<MatchPage> {
             await AppDatabase.instance.getAllPlayerDartStats();
 
         final Map<String, num>? playerStats = allDartStats[humanPlayer.id];
-        final num? rawAverage = playerStats == null ? null : playerStats['average'];
+        final num? rawAverage =
+            playerStats == null ? null : playerStats['average'];
 
         if (rawAverage != null && rawAverage > 0) {
           playerAverage = rawAverage.toDouble();
@@ -721,7 +762,8 @@ class _MatchPageState extends State<MatchPage> {
           dartCount: currentTurnDarts.length,
         );
 
-        final List<DartThrow> completedDarts = List<DartThrow>.from(currentTurnDarts);
+        final List<DartThrow> completedDarts =
+            List<DartThrow>.from(currentTurnDarts);
         currentTurnDarts.clear();
 
         _startTurnSummaryAndMove(
@@ -762,7 +804,8 @@ class _MatchPageState extends State<MatchPage> {
         dartCount: currentTurnDarts.length,
       );
 
-      final List<DartThrow> completedDarts = List<DartThrow>.from(currentTurnDarts);
+      final List<DartThrow> completedDarts =
+          List<DartThrow>.from(currentTurnDarts);
       currentTurnDarts.clear();
 
       _startTurnSummaryAndMove(
@@ -795,7 +838,8 @@ class _MatchPageState extends State<MatchPage> {
         dartCount: currentTurnDarts.length,
       );
 
-      final List<DartThrow> completedDarts = List<DartThrow>.from(currentTurnDarts);
+      final List<DartThrow> completedDarts =
+          List<DartThrow>.from(currentTurnDarts);
       currentTurnDarts.clear();
 
       _startTurnSummaryAndHandleLegWin(
@@ -833,7 +877,8 @@ class _MatchPageState extends State<MatchPage> {
         dartCount: currentTurnDarts.length,
       );
 
-      final List<DartThrow> completedDarts = List<DartThrow>.from(currentTurnDarts);
+      final List<DartThrow> completedDarts =
+          List<DartThrow>.from(currentTurnDarts);
       currentTurnDarts.clear();
 
       _startTurnSummaryAndMove(
@@ -921,7 +966,8 @@ class _MatchPageState extends State<MatchPage> {
     legDartsThrown[player.id] = (legDartsThrown[player.id] ?? 0) + dartCount;
     lastTurnScore[player.id] = safeScore;
 
-    final String dartLabels = darts.map((dartThrow) => dartThrow.label).join(' · ');
+    final String dartLabels =
+        darts.map((dartThrow) => dartThrow.label).join(' · ');
     final bool isClassic = !isBust && _isClassicTurn(darts);
 
     if (isClassic) {
@@ -1130,16 +1176,31 @@ class _MatchPageState extends State<MatchPage> {
       });
     }
 
-    if (shouldAnnounceCheckoutRequirement) {
-      await AudioService.instance.announceCheckoutRequirement(
-        playerName: _audioLabelForPlayer(playerToAnnounce),
-        remainingScore: scoreToAnnounce,
-      );
+    final bool customNamePlayed =
+        await _playCustomPlayerNameIfAvailable(playerToAnnounce);
+
+    if (customNamePlayed) {
+      if (shouldAnnounceCheckoutRequirement) {
+        await AudioService.instance.speak(
+          'benötigt $scoreToAnnounce Punkte.',
+        );
+      } else {
+        await AudioService.instance.speak(
+          'ist dran und braucht $scoreToAnnounce Punkte.',
+        );
+      }
     } else {
-      await AudioService.instance.announcePlayerTurn(
-        playerName: _audioLabelForPlayer(playerToAnnounce),
-        remainingScore: scoreToAnnounce,
-      );
+      if (shouldAnnounceCheckoutRequirement) {
+        await AudioService.instance.announceCheckoutRequirement(
+          playerName: _audioLabelForPlayer(playerToAnnounce),
+          remainingScore: scoreToAnnounce,
+        );
+      } else {
+        await AudioService.instance.announcePlayerTurn(
+          playerName: _audioLabelForPlayer(playerToAnnounce),
+          remainingScore: scoreToAnnounce,
+        );
+      }
     }
 
     await Future<void>.delayed(const Duration(milliseconds: 550));
@@ -1461,7 +1522,8 @@ class _MatchPageState extends State<MatchPage> {
 
   void _undoLastThrow() {
     if (botTurnRunning || turnIntroAnnouncementRunning || turnSummaryRunning) {
-      _showMessage('Während einer laufenden Aufnahme oder Ansage ist Undo gesperrt.');
+      _showMessage(
+          'Während einer laufenden Aufnahme oder Ansage ist Undo gesperrt.');
       return;
     }
 
@@ -1621,7 +1683,7 @@ class _MatchPageState extends State<MatchPage> {
             center: Alignment.topCenter,
             radius: 1.1,
             colors: [
-              accentColor.withValues(alpha:0.20),
+              accentColor.withValues(alpha: 0.20),
               const Color(0xFF0B0F14),
             ],
           ),
@@ -1682,10 +1744,10 @@ class _MatchPageState extends State<MatchPage> {
           width: 58,
           height: 58,
           decoration: BoxDecoration(
-            color: accentColor.withValues(alpha:0.13),
+            color: accentColor.withValues(alpha: 0.13),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: accentColor.withValues(alpha:0.25),
+              color: accentColor.withValues(alpha: 0.25),
             ),
           ),
           child: Icon(
@@ -1986,9 +2048,8 @@ class _MatchPageState extends State<MatchPage> {
   }
 
   Widget _buildTurnSummaryBlocker() {
-    final Color summaryColor = turnSummaryIsBust
-        ? const Color(0xFFFF5C77)
-        : const Color(0xFFFFB020);
+    final Color summaryColor =
+        turnSummaryIsBust ? const Color(0xFFFF5C77) : const Color(0xFFFFB020);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2093,9 +2154,10 @@ class _MatchPageState extends State<MatchPage> {
                   SizedBox(height: compact ? 16 : 26),
                   Row(
                     children: List.generate(3, (index) {
-                      final DartThrow? dartThrow = index < turnSummaryDarts.length
-                          ? turnSummaryDarts[index]
-                          : null;
+                      final DartThrow? dartThrow =
+                          index < turnSummaryDarts.length
+                              ? turnSummaryDarts[index]
+                              : null;
 
                       return Expanded(
                         child: Padding(
@@ -2209,7 +2271,8 @@ class _MatchPageState extends State<MatchPage> {
                           child: _BotThrowDisplayCard(
                             dartThrow: botDisplayDarts[index],
                             throwIndex: index + 1,
-                            isActive: activeBotDisplayIndex == index && botTurnRunning,
+                            isActive: activeBotDisplayIndex == index &&
+                                botTurnRunning,
                             accentColor: accentColor,
                           ),
                         ),
@@ -2223,7 +2286,8 @@ class _MatchPageState extends State<MatchPage> {
                     child: ElevatedButton.icon(
                       onPressed: botTurnRunning ? null : _maybeStartBotTurn,
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: Text(botTurnRunning ? 'Bot wirft...' : 'Botwurf starten'),
+                      label: Text(
+                          botTurnRunning ? 'Bot wirft...' : 'Botwurf starten'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: accentColor,
                         foregroundColor: const Color(0xFF06100B),
@@ -2357,7 +2421,7 @@ class _MatchPageState extends State<MatchPage> {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: accentColor.withValues(alpha:0.13),
+              color: accentColor.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -2407,7 +2471,7 @@ class _MatchPageState extends State<MatchPage> {
           decoration: BoxDecoration(
             color: dartThrow == null
                 ? const Color(0xFF141A22)
-                : accentColor.withValues(alpha:0.14),
+                : accentColor.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: dartThrow == null ? const Color(0xFF2A3545) : accentColor,
@@ -2504,10 +2568,10 @@ class _TurnSummaryDartCard extends StatelessWidget {
       height: 138,
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: const Color(0xFF101720).withValues(alpha:0.78),
+        color: const Color(0xFF101720).withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: summaryColor.withValues(alpha:0.75),
+          color: summaryColor.withValues(alpha: 0.75),
           width: 1.5,
         ),
       ),
@@ -2526,9 +2590,8 @@ class _TurnSummaryDartCard extends StatelessWidget {
           Text(
             hasThrow ? currentDartThrow.label : '-',
             style: TextStyle(
-              color: hasThrow
-                  ? const Color(0xFFEAF1F8)
-                  : const Color(0xFF6F7A89),
+              color:
+                  hasThrow ? const Color(0xFFEAF1F8) : const Color(0xFF6F7A89),
               fontSize: hasThrow ? 36 : 32,
               fontWeight: FontWeight.w900,
             ),
@@ -2572,7 +2635,7 @@ class _BotThrowDisplayCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: hasThrow || isActive
-            ? accentColor.withValues(alpha:0.13)
+            ? accentColor.withValues(alpha: 0.13)
             : const Color(0xFF141A22),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
@@ -2582,7 +2645,7 @@ class _BotThrowDisplayCard extends StatelessWidget {
         boxShadow: [
           if (isActive)
             BoxShadow(
-              color: accentColor.withValues(alpha:0.22),
+              color: accentColor.withValues(alpha: 0.22),
               blurRadius: 22,
               offset: const Offset(0, 8),
             ),
@@ -2594,7 +2657,8 @@ class _BotThrowDisplayCard extends StatelessWidget {
           Text(
             'Wurf $throwIndex',
             style: TextStyle(
-              color: hasThrow || isActive ? accentColor : const Color(0xFF6F7A89),
+              color:
+                  hasThrow || isActive ? accentColor : const Color(0xFF6F7A89),
               fontSize: 13,
               fontWeight: FontWeight.w900,
             ),
@@ -2603,7 +2667,8 @@ class _BotThrowDisplayCard extends StatelessWidget {
           Text(
             hasThrow ? currentDartThrow.label : '-',
             style: TextStyle(
-              color: hasThrow ? const Color(0xFFEAF1F8) : const Color(0xFF6F7A89),
+              color:
+                  hasThrow ? const Color(0xFFEAF1F8) : const Color(0xFF6F7A89),
               fontSize: hasThrow ? 42 : 38,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.4,
@@ -2611,7 +2676,11 @@ class _BotThrowDisplayCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            hasThrow ? '${currentDartThrow.score} Punkte' : isActive ? 'zielt...' : 'wartet',
+            hasThrow
+                ? '${currentDartThrow.score} Punkte'
+                : isActive
+                    ? 'zielt...'
+                    : 'wartet',
             style: TextStyle(
               color: hasThrow ? accentColor : const Color(0xFF9DA8B7),
               fontSize: 14,
