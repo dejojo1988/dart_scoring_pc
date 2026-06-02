@@ -1,6 +1,6 @@
 {
-  "version": "1.0.3.4",
+  "version": "1.0.3.5",
   "channel": "beta",
-  "installerUrl": "https://github.com/dejojo1988/dart_scoring_pc/releases/download/v1.0.3.4-beta/DartScoringPC-Setup-1.0.3.4-beta.exe",
-  "notes": "Version 1.0.3.4 BETA: Neuer Trainingsbereich mit Streuungsanalyse, Board-Tap-System, Zielmarkierung, Ergebnis-Seite, Trainingsstatistik, gespeicherten Sessions, Detailansicht und Session-Wiederholung."
+  "installerUrl": "https://github.com/dejojo1988/dart_scoring_pc/releases/download/v1.0.3.5-beta/DartScoringPC-Setup-1.0.3.5-beta.exe",
+  "notes": "Version 1.0.3.5 BETA: Spielerprofile können eigene Namensansagen als WAV-Audio speichern, testen und entfernen. Im Match wird nach Game On automatisch die eigene Spieleransage genutzt. Zusätzlich Windows-Build-Fix für aktuelle MSVC Build Tools."
 }
