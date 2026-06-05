@@ -27,6 +27,16 @@ class GameSelectionPage extends StatelessWidget {
     );
   }
 
+  void _openChaseTheHitSetup(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MatchSetupPage(
+          initialSettings: GameSettings.defaultChaseTheHit(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color accentColor = Theme.of(context).colorScheme.primary;
@@ -72,6 +82,14 @@ class GameSelectionPage extends StatelessWidget {
                           icon: Icons.access_time_filled_rounded,
                           onPressed: () {
                             _openRoundTheClockSetup(context);
+                          },
+                        ),
+                        AppButton(
+                          title: 'Chase the Hit',
+                          subtitle: 'Ziel treffen, neues Ziel setzen, Runde gewinnen',
+                          icon: Icons.center_focus_strong_rounded,
+                          onPressed: () {
+                            _openChaseTheHitSetup(context);
                           },
                         ),
                       ],

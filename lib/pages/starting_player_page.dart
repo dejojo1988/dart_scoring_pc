@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../models/game_settings.dart';
 import '../models/player.dart';
+import 'chase_the_hit_match_page.dart';
 import 'match_page.dart';
 import 'round_the_clock_match_page.dart';
 
@@ -124,6 +125,21 @@ class _StartingPlayerPageState extends State<StartingPlayerPage> {
 
     if (startingPlayer == null) {
       _showMessage('Wähle einen Startspieler aus.');
+      return;
+    }
+
+
+    if (widget.settings.gameType == GameType.chaseTheHit) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ChaseTheHitMatchPage(
+            settings: widget.settings,
+            players: widget.players,
+            startingPlayer: startingPlayer,
+          ),
+        ),
+      );
+
       return;
     }
 

@@ -1,6 +1,7 @@
 enum GameType {
   x01,
   roundTheClock,
+  chaseTheHit,
 }
 
 enum X01StartScore {
@@ -28,6 +29,11 @@ enum MatchUnit {
   sets,
 }
 
+enum ChaseTheHitMode {
+  segment,
+  exact,
+}
+
 class GameSettings {
   final GameType gameType;
   final X01StartScore x01StartScore;
@@ -38,6 +44,9 @@ class GameSettings {
   final MatchUnit matchUnit;
   final int matchTarget;
 
+  final ChaseTheHitMode chaseTheHitMode;
+  final int chaseTheHitPointsToWin;
+
   const GameSettings({
     required this.gameType,
     required this.x01StartScore,
@@ -46,6 +55,8 @@ class GameSettings {
     required this.matchMode,
     required this.matchUnit,
     required this.matchTarget,
+    required this.chaseTheHitMode,
+    required this.chaseTheHitPointsToWin,
   });
 
   int get startScore {
@@ -63,6 +74,8 @@ class GameSettings {
         return '$startScore x01';
       case GameType.roundTheClock:
         return 'Round the Clock';
+      case GameType.chaseTheHit:
+        return 'Chase the Hit';
     }
   }
 
@@ -102,7 +115,20 @@ class GameSettings {
     }
   }
 
+  String get chaseTheHitModeLabel {
+    switch (chaseTheHitMode) {
+      case ChaseTheHitMode.segment:
+        return 'Segment Mode';
+      case ChaseTheHitMode.exact:
+        return 'Exact Mode';
+    }
+  }
+
   String get matchFormatLabel {
+    if (gameType == GameType.chaseTheHit) {
+      return '$chaseTheHitModeLabel · First to $chaseTheHitPointsToWin Points';
+    }
+
     return '$matchModeLabel $matchTarget $matchUnitLabel';
   }
 
@@ -123,6 +149,8 @@ class GameSettings {
     MatchMode? matchMode,
     MatchUnit? matchUnit,
     int? matchTarget,
+    ChaseTheHitMode? chaseTheHitMode,
+    int? chaseTheHitPointsToWin,
   }) {
     return GameSettings(
       gameType: gameType ?? this.gameType,
@@ -132,6 +160,9 @@ class GameSettings {
       matchMode: matchMode ?? this.matchMode,
       matchUnit: matchUnit ?? this.matchUnit,
       matchTarget: matchTarget ?? this.matchTarget,
+      chaseTheHitMode: chaseTheHitMode ?? this.chaseTheHitMode,
+      chaseTheHitPointsToWin:
+          chaseTheHitPointsToWin ?? this.chaseTheHitPointsToWin,
     );
   }
 
@@ -144,6 +175,8 @@ class GameSettings {
       matchMode: MatchMode.bestOf,
       matchUnit: MatchUnit.legs,
       matchTarget: 3,
+      chaseTheHitMode: ChaseTheHitMode.segment,
+      chaseTheHitPointsToWin: 10,
     );
   }
 
@@ -156,6 +189,22 @@ class GameSettings {
       matchMode: MatchMode.bestOf,
       matchUnit: MatchUnit.legs,
       matchTarget: 1,
+      chaseTheHitMode: ChaseTheHitMode.segment,
+      chaseTheHitPointsToWin: 10,
+    );
+  }
+
+  factory GameSettings.defaultChaseTheHit() {
+    return const GameSettings(
+      gameType: GameType.chaseTheHit,
+      x01StartScore: X01StartScore.score501,
+      inMode: InMode.straightIn,
+      outMode: OutMode.straightOut,
+      matchMode: MatchMode.firstTo,
+      matchUnit: MatchUnit.legs,
+      matchTarget: 1,
+      chaseTheHitMode: ChaseTheHitMode.segment,
+      chaseTheHitPointsToWin: 10,
     );
   }
 }

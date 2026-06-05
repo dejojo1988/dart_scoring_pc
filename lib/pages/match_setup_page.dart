@@ -33,6 +33,7 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
 
   bool get isX01 => settings.gameType == GameType.x01;
   bool get isRoundTheClock => settings.gameType == GameType.roundTheClock;
+  bool get isChaseTheHit => settings.gameType == GameType.chaseTheHit;
 
   Player get adaptiveBotPlayer {
     return const Player(
@@ -468,6 +469,11 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
       return;
     }
 
+    if (isChaseTheHit && selectedPlayers.length < 2) {
+      _showMessage('Chase the Hit braucht mindestens 2 Spieler.');
+      return;
+    }
+
     if (botOpponentEnabled) {
       if (!canUseBotOpponent) {
         _showMessage('Bot-Gegner ist aktuell nur für x01 verfügbar.');
@@ -587,7 +593,11 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
             ),
           ),
           child: Icon(
-            isX01 ? Icons.tune_rounded : Icons.access_time_filled_rounded,
+            isX01
+                ? Icons.tune_rounded
+                : isChaseTheHit
+                    ? Icons.center_focus_strong_rounded
+                    : Icons.access_time_filled_rounded,
             color: accentColor,
             size: 34,
           ),
@@ -608,7 +618,9 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
             Text(
               isX01
                   ? 'Spieler auswählen und Match-Regeln einstellen'
-                  : 'Spieler auswählen und Round-the-Clock-Regeln einstellen',
+                  : isChaseTheHit
+                      ? 'Spieler auswählen und Chase-the-Hit-Regeln einstellen'
+                      : 'Spieler auswählen und Round-the-Clock-Regeln einstellen',
               style: const TextStyle(
                 fontSize: 15,
                 color: Color(0xFF9DA8B7),
@@ -678,172 +690,237 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
       subtitle: settings.matchFormatLabel,
       child: ListView(
         children: [
-          if (isX01) ...[
-            const _SectionTitle('Startscore'),
+          if (isChaseTheHit) ...[
+            const _InfoBox(
+              text:
+                  'Chase the Hit nutzt kein 301/501, keine Legs/Sets und keine In-/Out-Regeln. Ziel treffen, neues Ziel setzen, letzte aktive Person gewinnt die Runde.',
+            ),
+            const SizedBox(height: 26),
+            const _SectionTitle('Chase Mode'),
             const SizedBox(height: 12),
             _ChoiceRow(
               children: [
                 _ChoiceButton(
-                  label: '301',
-                  selected: settings.x01StartScore == X01StartScore.score301,
+                  label: 'Segment Mode',
+                  selected:
+                      settings.chaseTheHitMode == ChaseTheHitMode.segment,
                   onTap: () {
                     setState(() {
                       settings = settings.copyWith(
-                        x01StartScore: X01StartScore.score301,
+                        chaseTheHitMode: ChaseTheHitMode.segment,
                       );
                     });
                   },
                 ),
                 _ChoiceButton(
-                  label: '501',
-                  selected: settings.x01StartScore == X01StartScore.score501,
+                  label: 'Exact Mode',
+                  selected: settings.chaseTheHitMode == ChaseTheHitMode.exact,
                   onTap: () {
                     setState(() {
                       settings = settings.copyWith(
-                        x01StartScore: X01StartScore.score501,
+                        chaseTheHitMode: ChaseTheHitMode.exact,
                       );
                     });
                   },
                 ),
               ],
             ),
+            const SizedBox(height: 14),
+            _InfoBox(
+              text: settings.chaseTheHitMode == ChaseTheHitMode.segment
+                  ? 'Segment Mode: S20, D20 und T20 zählen alle als 20. Outer Bull und Bull zählen beide als Bull-Bereich.'
+                  : 'Exact Mode: Das exakte Feld muss getroffen werden. D20 ist D20, T20 ist T20, Outer Bull ist Outer Bull.',
+            ),
             const SizedBox(height: 26),
-            const _SectionTitle('Bot-Gegner'),
+            const _SectionTitle('Punkte-Limit'),
             const SizedBox(height: 12),
-            _BotOpponentCard(
-              enabled: botOpponentEnabled,
-              selectedHumanPlayers: selectedPlayers.length,
-              onChanged: _toggleBotOpponent,
+            _NumberSelector(
+              label: 'First to Points',
+              value: settings.chaseTheHitPointsToWin,
+              min: 5,
+              max: 50,
+              step: 5,
+              onChanged: (value) {
+                setState(() {
+                  settings = settings.copyWith(
+                    chaseTheHitPointsToWin: value,
+                  );
+                });
+              },
             ),
-            const SizedBox(height: 26),
-          ],
-          if (isRoundTheClock) ...[
-            const _InfoBox(
+            const SizedBox(height: 14),
+            _InfoBox(
               text:
-                  'Round the Clock braucht keine 301/501-Auswahl, keine In-Regel und keine Out-Regel. Ziel: Zahlen der Reihe nach treffen.',
+                  'Matchende: Wer zuerst ${settings.chaseTheHitPointsToWin} Punkte erreicht, gewinnt Chase the Hit.',
             ),
-            const SizedBox(height: 26),
-            const _InfoBox(
-              text:
-                  'Bot-Gegner ist in dieser Beta zuerst nur für x01 aktiviert. Round the Clock bekommt den Bot später separat.',
-            ),
-            const SizedBox(height: 26),
-          ],
-          const _SectionTitle('Match-Modus'),
-          const SizedBox(height: 12),
-          _ChoiceRow(
-            children: [
-              _ChoiceButton(
-                label: 'Best of',
-                selected: settings.matchMode == MatchMode.bestOf,
-                onTap: () {
-                  _setMatchMode(MatchMode.bestOf);
-                },
+          ] else ...[
+            if (isX01) ...[
+              const _SectionTitle('Startscore'),
+              const SizedBox(height: 12),
+              _ChoiceRow(
+                children: [
+                  _ChoiceButton(
+                    label: '301',
+                    selected: settings.x01StartScore == X01StartScore.score301,
+                    onTap: () {
+                      setState(() {
+                        settings = settings.copyWith(
+                          x01StartScore: X01StartScore.score301,
+                        );
+                      });
+                    },
+                  ),
+                  _ChoiceButton(
+                    label: '501',
+                    selected: settings.x01StartScore == X01StartScore.score501,
+                    onTap: () {
+                      setState(() {
+                        settings = settings.copyWith(
+                          x01StartScore: X01StartScore.score501,
+                        );
+                      });
+                    },
+                  ),
+                ],
               ),
-              _ChoiceButton(
-                label: 'First to',
-                selected: settings.matchMode == MatchMode.firstTo,
-                onTap: () {
-                  _setMatchMode(MatchMode.firstTo);
-                },
+              const SizedBox(height: 26),
+              const _SectionTitle('Bot-Gegner'),
+              const SizedBox(height: 12),
+              _BotOpponentCard(
+                enabled: botOpponentEnabled,
+                selectedHumanPlayers: selectedPlayers.length,
+                onChanged: _toggleBotOpponent,
               ),
+              const SizedBox(height: 26),
             ],
-          ),
-          const SizedBox(height: 26),
-          const _SectionTitle('Zählart'),
-          const SizedBox(height: 12),
-          _ChoiceRow(
-            children: [
-              _ChoiceButton(
-                label: 'Legs',
-                selected: settings.matchUnit == MatchUnit.legs,
-                onTap: () {
-                  setState(() {
-                    settings = settings.copyWith(matchUnit: MatchUnit.legs);
-                  });
-                },
+            if (isRoundTheClock) ...[
+              const _InfoBox(
+                text:
+                    'Round the Clock braucht keine 301/501-Auswahl, keine In-Regel und keine Out-Regel. Ziel: Zahlen der Reihe nach treffen.',
               ),
-              _ChoiceButton(
-                label: 'Sets',
-                selected: settings.matchUnit == MatchUnit.sets,
-                onTap: () {
-                  setState(() {
-                    settings = settings.copyWith(matchUnit: MatchUnit.sets);
-                  });
-                },
+              const SizedBox(height: 26),
+              const _InfoBox(
+                text:
+                    'Bot-Gegner ist in dieser Beta zuerst nur für x01 aktiviert. Round the Clock bekommt den Bot später separat.',
               ),
+              const SizedBox(height: 26),
             ],
-          ),
-          const SizedBox(height: 26),
-          const _SectionTitle('Anzahl'),
-          const SizedBox(height: 12),
-          _NumberSelector(
-            label: settings.matchMode == MatchMode.bestOf
-                ? 'Best of ${settings.matchUnitLabel}'
-                : 'First to ${settings.matchUnitLabel}',
-            value: settings.matchTarget,
-            min: 1,
-            max: 19,
-            step: settings.matchMode == MatchMode.bestOf ? 2 : 1,
-            onChanged: _changeMatchTarget,
-          ),
-          const SizedBox(height: 14),
-          _InfoBox(
-            text:
-                '${settings.matchFormatLabel} bedeutet: Zum Sieg benötigt man ${settings.neededToWin} ${settings.matchUnit == MatchUnit.legs ? 'gewonnene Legs' : 'gewonnene Sets'}.',
-          ),
-          if (isX01) ...[
-            const SizedBox(height: 26),
-            const _SectionTitle('In-Regel'),
+            const _SectionTitle('Match-Modus'),
             const SizedBox(height: 12),
             _ChoiceRow(
               children: [
                 _ChoiceButton(
-                  label: 'Straight In',
-                  selected: settings.inMode == InMode.straightIn,
+                  label: 'Best of',
+                  selected: settings.matchMode == MatchMode.bestOf,
+                  onTap: () {
+                    _setMatchMode(MatchMode.bestOf);
+                  },
+                ),
+                _ChoiceButton(
+                  label: 'First to',
+                  selected: settings.matchMode == MatchMode.firstTo,
+                  onTap: () {
+                    _setMatchMode(MatchMode.firstTo);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 26),
+            const _SectionTitle('Zählart'),
+            const SizedBox(height: 12),
+            _ChoiceRow(
+              children: [
+                _ChoiceButton(
+                  label: 'Legs',
+                  selected: settings.matchUnit == MatchUnit.legs,
                   onTap: () {
                     setState(() {
-                      settings = settings.copyWith(inMode: InMode.straightIn);
+                      settings = settings.copyWith(matchUnit: MatchUnit.legs);
                     });
                   },
                 ),
                 _ChoiceButton(
-                  label: 'Double In',
-                  selected: settings.inMode == InMode.doubleIn,
+                  label: 'Sets',
+                  selected: settings.matchUnit == MatchUnit.sets,
                   onTap: () {
                     setState(() {
-                      settings = settings.copyWith(inMode: InMode.doubleIn);
+                      settings = settings.copyWith(matchUnit: MatchUnit.sets);
                     });
                   },
                 ),
               ],
             ),
             const SizedBox(height: 26),
-            const _SectionTitle('Out-Regel'),
+            const _SectionTitle('Anzahl'),
             const SizedBox(height: 12),
-            _ChoiceRow(
-              children: [
-                _ChoiceButton(
-                  label: 'Straight Out',
-                  selected: settings.outMode == OutMode.straightOut,
-                  onTap: () {
-                    setState(() {
-                      settings =
-                          settings.copyWith(outMode: OutMode.straightOut);
-                    });
-                  },
-                ),
-                _ChoiceButton(
-                  label: 'Double Out',
-                  selected: settings.outMode == OutMode.doubleOut,
-                  onTap: () {
-                    setState(() {
-                      settings = settings.copyWith(outMode: OutMode.doubleOut);
-                    });
-                  },
-                ),
-              ],
+            _NumberSelector(
+              label: settings.matchMode == MatchMode.bestOf
+                  ? 'Best of ${settings.matchUnitLabel}'
+                  : 'First to ${settings.matchUnitLabel}',
+              value: settings.matchTarget,
+              min: 1,
+              max: 19,
+              step: settings.matchMode == MatchMode.bestOf ? 2 : 1,
+              onChanged: _changeMatchTarget,
             ),
+            const SizedBox(height: 14),
+            _InfoBox(
+              text:
+                  '${settings.matchFormatLabel} bedeutet: Zum Sieg benötigt man ${settings.neededToWin} ${settings.matchUnit == MatchUnit.legs ? 'gewonnene Legs' : 'gewonnene Sets'}.',
+            ),
+            if (isX01) ...[
+              const SizedBox(height: 26),
+              const _SectionTitle('In-Regel'),
+              const SizedBox(height: 12),
+              _ChoiceRow(
+                children: [
+                  _ChoiceButton(
+                    label: 'Straight In',
+                    selected: settings.inMode == InMode.straightIn,
+                    onTap: () {
+                      setState(() {
+                        settings = settings.copyWith(inMode: InMode.straightIn);
+                      });
+                    },
+                  ),
+                  _ChoiceButton(
+                    label: 'Double In',
+                    selected: settings.inMode == InMode.doubleIn,
+                    onTap: () {
+                      setState(() {
+                        settings = settings.copyWith(inMode: InMode.doubleIn);
+                      });
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 26),
+              const _SectionTitle('Out-Regel'),
+              const SizedBox(height: 12),
+              _ChoiceRow(
+                children: [
+                  _ChoiceButton(
+                    label: 'Straight Out',
+                    selected: settings.outMode == OutMode.straightOut,
+                    onTap: () {
+                      setState(() {
+                        settings =
+                            settings.copyWith(outMode: OutMode.straightOut);
+                      });
+                    },
+                  ),
+                  _ChoiceButton(
+                    label: 'Double Out',
+                    selected: settings.outMode == OutMode.doubleOut,
+                    onTap: () {
+                      setState(() {
+                        settings = settings.copyWith(outMode: OutMode.doubleOut);
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ],
           ],
         ],
       ),
@@ -855,7 +932,9 @@ class _MatchSetupPageState extends State<MatchSetupPage> {
 
     final String rulesText = isX01
         ? '${settings.gameTitle} · ${settings.matchFormatLabel} · ${settings.inModeLabel} · ${settings.outModeLabel} · Spieler: ${selectedPlayers.length}$botText'
-        : '${settings.gameTitle} · ${settings.matchFormatLabel} · Spieler: ${selectedPlayers.length}';
+        : isChaseTheHit
+            ? '${settings.gameTitle} · ${settings.chaseTheHitModeLabel} · First to ${settings.chaseTheHitPointsToWin} · Spieler: ${selectedPlayers.length}'
+            : '${settings.gameTitle} · ${settings.matchFormatLabel} · Spieler: ${selectedPlayers.length}';
 
     final Color accentColor = Theme.of(context).colorScheme.primary;
 

@@ -311,6 +311,72 @@ class AudioService {
     );
   }
 
+
+  Future<bool> playDefaultPackFile(
+    String fileName, {
+    bool waitForCompletion = true,
+  }) async {
+    await load();
+
+    if (!_settings.audioEnabled) {
+      return false;
+    }
+
+    final String cleanFileName = fileName.trim();
+
+    if (cleanFileName.isEmpty ||
+        cleanFileName.contains('/') ||
+        cleanFileName.contains('\\') ||
+        !_isWavPath(cleanFileName)) {
+      return false;
+    }
+
+    return _playAssetFile(
+      '$_defaultPackAssetBasePath/$cleanFileName',
+      waitForCompletion: waitForCompletion,
+    );
+  }
+
+  Future<bool> playDefaultNumber(
+    int number, {
+    bool waitForCompletion = true,
+  }) async {
+    await load();
+
+    if (!_settings.audioEnabled) {
+      return false;
+    }
+
+    if (number < 0 || number > 180) {
+      return false;
+    }
+
+    return _playAssetFile(
+      '$_defaultPackAssetBasePath/$number.wav',
+      waitForCompletion: waitForCompletion,
+    );
+  }
+
+  Future<bool> playDefaultPlayerNumber(
+    int playerNumber, {
+    bool waitForCompletion = true,
+  }) async {
+    await load();
+
+    if (!_settings.audioEnabled) {
+      return false;
+    }
+
+    if (playerNumber < 1 || playerNumber > 8) {
+      return false;
+    }
+
+    return _playAssetFile(
+      '$_defaultPackAssetBasePath/player-$playerNumber.wav',
+      waitForCompletion: waitForCompletion,
+    );
+  }
+
   Future<void> testEvent(AudioEventType eventType) async {
     if (eventType == AudioEventType.turnScore) {
       await announceTurnScore(
